@@ -1,59 +1,76 @@
 use crate::board::Board;
+use crate::heuristic;
 use crate::mov::Move;
 
 struct Solver {
 	explored_positions: u128
 }
 
+const MIN_SCORE: i8 = -100;
+const MAX_SCORE: i8 = 100;
+
 impl Solver {
 	pub fn solve(board: Board, depth: Option<u8>) -> (i8, Option<Move>, u128) {
 		let mut solver = Solver { explored_positions: 0 };
 
-		let (score, mov) = solver.negamax0(board, depth.unwrap_or(5));
+		let (score, mov) = solver.negamax0(board, MIN_SCORE, MAX_SCORE, depth.unwrap_or(5));
 
 		(score, mov, solver.explored_positions)
 	}
 
-	// TODO: alpha beta pruning at least, maybe tr tables.
-	fn negamax0(&mut self, board: Board, depth: u8) -> (i8, Option<Move>) {
+	// TODO: simple heuristic, maybe tr tables.
+	fn negamax0(&mut self, board: Board, mut alpha: i8, mut beta: i8, depth: u8) -> (i8, Option<Move>) {
 		self.explored_positions += 1;
+
+		// let current_score = board.current_score();
 
 		if depth == 0 {
 			return (board.current_score(), None)
 		}
 
-		let mut max_score = i8::MIN;
 		let mut best_mov: Option<Move> = None;
 
+		// if beta > current_score {
+		// 	beta = current_score;
+		// 	if alpha >= beta { return (beta, best_mov) }
+		// }
+
 		for mov in board.possible_moves() {
-			let score = -self.negamax(board.next(mov), depth - 1);
+			let score = -self.negamax(board.next(mov), -beta, -alpha, depth - 1);
 			// println!("{:?} - {}", mov, score);
-			if score > max_score {
-				max_score = score;
+			if score >= beta {
+				return (score, Some(mov))
+			}
+
+			if score > alpha {
+				alpha = score;
 				best_mov = Some(mov);
 			}
 		}
 
-		return (max_score, best_mov);
+		return (alpha, best_mov);
 	}
 
-	fn negamax(&mut self, board: Board, depth: u8) -> i8 {
+	fn negamax(&mut self, board: Board, mut alpha: i8, mut beta: i8, depth: u8) -> i8 {
 		self.explored_positions += 1;
 
 		if depth == 0 {
 			return board.current_score()
 		}
 
-		let mut max_score = i8::MIN;
-
 		for mov in board.possible_moves() {
-			let score = -self.negamax(board.next(mov), depth - 1);
-			if score > max_score {
-				max_score = score;
+			let score = -self.negamax(board.next(mov), -beta, -alpha, depth - 1);
+
+			if score >= beta {
+				return score
+			}
+
+			if score > alpha {
+				alpha = score;
 			}
 		}
 
-		return max_score;
+		return alpha;
 	}
 }
 
@@ -74,7 +91,8 @@ mod tests {
 	#[test]
 	fn depths() {
 		for i in 1..25 {
-			let board = Board::from_fen("5/5/5/5/5").unwrap();
+			// let board = Board::from_fen("5/5/5/5/5").unwrap();
+			let board = Board::from_fen("1wbw/2b/1bb/5/5").unwrap();
 			let now = std::time::Instant::now();
 			let (.., explored_positions) = Solver::solve(board, Some(i));
 			let duration = now.elapsed().as_secs_f32();
@@ -83,7 +101,7 @@ mod tests {
 				i, duration, explored_positions
 			);
 			assert!(
-				duration < 5.0,
+				duration < 10.0,
 				"{}", message
 			);
 			println!("{}", message);

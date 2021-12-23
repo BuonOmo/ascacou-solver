@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<!-- https://jsfiddle.net/ulysse_bn/4Lyw07oh/3/ -->
+	<meta charset="UTF-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<title>Bitfiddle</title>
+	<style>
+		.row { display: flex; font-size: 9.5px; text-align: center; }
+		.cell { width: 50px; height: 50px; margin: 1px; border: 1px solid black; }
+		.cell.on { background: black; color: white }
+	</style>
+</head>
+<body>
+	<div id="container"></div>
+
+
+	<div>&nbsp;</div>
+	<input type="text" id="text" placeholder="x & (x << 7)">
+	<input type="button" value="apply" id="apply">
+	<input type="button" value="prev" id="prev">
+	<script>
+		let width = 6
+		let height = 5
+
+		let val = 0
+
+		let history = []
+
+		let s = ""
+
+		for (let i = 0; i < height; i++) {
+			s += '<div class="row">'
+			for (let j = 0; j < width; j++) {
+			let v =  i + (j * height)
+			s += `<div class="cell cell${v} off" data-exp=${v}> ${v} </div>`
+		}
+		s += '</div>'
+		}
+
+		container.innerHTML = s
+
+		const getValue = () => { return val }
+		const setValue = (x) => {
+		console.table(history)
+			val = x
+		for (let i = 0; i < height * width; i++) {
+			let cell = document.querySelector(`.cell${i}`)
+
+			if ((val & (1 << i)) != 0) {
+				cell.classList.add('on')
+			} else {
+				cell.classList.remove('on')
+			}
+		}
+		}
+
+		document.addEventListener('click', (e) => {
+			if (!e.target.classList.contains('cell')) { return }
+
+		if (e.target.classList.contains('on')) {
+			e.target.classList.remove('on')
+			let mask = ((1 << (width * height)) - 1) ^ (1 << +e.target.dataset.exp)
+			val = val & mask
+		} else {
+			val = val | (1 << +e.target.dataset.exp)
+			e.target.classList.add('on')
+		}
+		e.preventDefault()
+		})
+
+		apply.addEventListener('click', (e) => {
+			x = getValue()
+		history.push([text.value, x])
+		x = eval(text.value)
+		setValue(x)
+		text.value = ''
+		e.preventDefault()
+		})
+
+		prev.addEventListener('click', (e) => {
+			let [tr, x] = history.pop()
+		console.log(history)
+		console.log(x)
+		text.value = tr
+		setValue(x)
+		e.preventDefault()
+		})
+
+		// x & (x << 1)
+	</script>
+</body>
+</html>

@@ -39,5 +39,16 @@ pub fn sorted_moves(moves: impl Iterator<Item=Move>, favorite_color: Color) -> i
 }
 
 const fn square_score(x: u64, y: u64) -> u8 {
-	0 // TODO
+	// Corners, only part of one square.
+	if x == 0 && y == 0 { return 0 }
+	if x == 4 && y == 4 { return 0 }
+	if x == 0 && y == 4 { return 0 }
+	if x == 4 && y == 0 { return 0 }
+
+	// Edges, part of two squares.
+	if x == 0 || y == 0 || x == 4 || y == 4 { return 1 }
+
+	// Otherwise, the position may have 4 squares, hence
+	// more likely to change the score.
+	return 2
 }

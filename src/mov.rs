@@ -2,21 +2,24 @@ use crate::color::Color;
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub struct Move {
-	pub x: u64,
-	pub y: u64,
+	// We use signed numbers to be able to
+	// have -1 as a move when doing bit ops
+	// since the bitboard is 7x7.
+	pub x: i8,
+	pub y: i8,
 	pub color: Color,
 }
 
 impl Move {
-	pub fn new(x: u64, y: u64, color: Color) -> Move {
+	pub fn new(x: i8, y: i8, color: Color) -> Move {
 		Move { x, y, color }
 	}
 
-	pub fn black(x: u64, y: u64) -> Move {
+	pub fn black(x: i8, y: i8) -> Move {
 		Move::new(x, y, Color::Black)
 	}
 
-	pub fn white(x: u64, y: u64) -> Move {
+	pub fn white(x: i8, y: i8) -> Move {
 		Move::new(x, y, Color::White)
 	}
 }

@@ -18,7 +18,7 @@ impl Solver {
 		(score, mov, solver.explored_positions)
 	}
 
-	// TODO: simple heuristic, maybe tr tables.
+	// TODO: transposition tables.
 	fn negamax0(&mut self, board: Board, mut alpha: i8, mut beta: i8, depth: u8) -> (i8, Option<Move>) {
 		self.explored_positions += 1;
 
@@ -58,6 +58,8 @@ impl Solver {
 
 	fn negamax(&mut self, board: Board, mut alpha: i8, mut beta: i8, depth: u8) -> i8 {
 		self.explored_positions += 1;
+
+		// TODO: detect terminal position.
 
 		if depth == 0 {
 			return board.current_score()

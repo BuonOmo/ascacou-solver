@@ -4,6 +4,7 @@ mod heuristic;
 mod mov;
 mod player;
 mod solver;
+mod tileset;
 
 fn main() {
     for i in 0..=9 {

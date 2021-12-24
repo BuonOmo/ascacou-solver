@@ -1,6 +1,7 @@
 use crate::color::Color;
 use crate::mov::Move;
 use crate::player::Player;
+use crate::tileset::TileSet;
 
 pub struct Board {
 	pieces_mask: u64,
@@ -37,7 +38,7 @@ impl Board {
 		let mut white_mask =  0u64;
 
 		let mut x = 0;
-		let mut y: u64;
+		let mut y: i8;
 		let mut moves = 0;
 
 		for line in fen.split('/') {
@@ -48,8 +49,8 @@ impl Board {
 				if y > 4 { return Err("out of bound") }
 
 				match chr {
-					'b' => { moves += 1; black_mask |= Board::position(x, y) },
-					'w' => { moves += 1; white_mask |= Board::position(x, y) },
+					'b' => { moves += 1; black_mask |= Board::position_mask(x, y) },
+					'w' => { moves += 1; white_mask |= Board::position_mask(x, y) },
 					'1' => y += 0,
 					'2' => y += 1,
 					'3' => y += 2,
@@ -73,12 +74,18 @@ impl Board {
 	pub fn possible_moves(&self) -> impl Iterator<Item=Move> + '_ {
 		let mut result: Vec<Move> = Vec::with_capacity(50);
 
+		let tiles = TileSet::from(self.filled_tiles());
+
 		for x in 0..5 {
 			for y in 0..5 {
+				// Already a piece there.
+				if Board::position_mask(x, y) & self.pieces_mask != 0 { continue }
+
 				for color in [Color::Black, Color::White] {
-					if self.can_play(x, y, color) {
-						result.push(Move::new(x, y, color))
-					}
+					let mov = Move::new(x, y, color);
+					if self.already_played(&mov, &tiles) { continue }
+
+					result.push(mov)
 				}
 			}
 		}
@@ -86,9 +93,24 @@ impl Board {
 		result.into_iter()
 	}
 
+	// TODO: a smarter score computation could be done by taking into
+	// account each player's score, and give a greater edge to a position
+	// close to terminal.
 	pub fn current_score(&self) -> i8 {
 		let mut score = 0;
 
+		for tile in self.filled_tiles() {
+			if self.current_player.has_tile(tile) {
+				score += 1;
+			} else {
+				score -= 1;
+			}
+		}
+
+		score
+	}
+
+	fn filled_tiles(&self) -> std::collections::LinkedList<u8> {
 		let mut filled_tiles: std::collections::LinkedList<u8> = std::collections::LinkedList::new();
 		// First, we retrieve every top-left corners of filled tiles
 		let mut mask = self.pieces_mask & (self.pieces_mask >> 1);
@@ -100,23 +122,9 @@ impl Board {
 			let top_left = prev - mask;
 			// Then we find the tile value associated
 			// for each tile.
-			let mut tile = 0u8;
-			if top_left & self.black_mask != 0 { tile |= 1 }
-			if (top_left << 1) & self.black_mask != 0 { tile |= 2 }
-			if (top_left << 7) & self.black_mask != 0 { tile |= 4 }
-			if (top_left << 8) & self.black_mask != 0 { tile |= 8 }
-			filled_tiles.push_back(tile);
+			filled_tiles.push_back(self.tile_at(top_left));
 		}
-
-		for tile in filled_tiles {
-			if self.current_player.has_tile(tile) {
-				score += 1;
-			} else {
-				score -= 1;
-			}
-		}
-
-		score
+		filled_tiles
 	}
 
 	pub fn other_player(&self) -> Player {
@@ -131,7 +139,7 @@ impl Board {
 	 * Apply a move without checking for its validity.
 	 */
 	pub fn next(&self, mov: Move) -> Board {
-		let pos = Board::position(mov.x, mov.y);
+		let pos = Board::position_mask(mov.x, mov.y);
 		Board {
 			pieces_mask: self.pieces_mask | pos,
 			white_mask: if mov.color == Color::White { self.white_mask | pos } else { self.white_mask },
@@ -142,15 +150,74 @@ impl Board {
 		}
 	}
 
-	fn can_play(&self, x: u64, y: u64, color: Color) -> bool {
-		// TODO: also check for moves that cannot be played
-		//   due to color restrictions.
-		Board::position(x, y) & self.pieces_mask == 0
+	fn already_played<'a>(&self, mov: &'a Move, exhausted_tiles: &'a TileSet) -> bool {
+		for tile in self.tiles_from(&mov) {
+			if exhausted_tiles.has(tile) { return true }
+		}
+		return false
 	}
 
-	fn position(x: u64, y: u64) -> u64 {
+	/**
+	 * From a empty square, checks which tiles could be created if we play
+	 * a given move. This function doesn't check for emptiness of the square.
+	 */
+	fn tiles_from<'a>(&self, mov: &'a Move) -> std::collections::LinkedList<u8> {
+		let mut tiles = std::collections::LinkedList::new();
+		let pos = Board::position_mask(mov.x, mov.y);
+		let mask_with_new_piece = self.pieces_mask | pos;
+
+		// TODO(refacto): consider using bottom right rather than top left to work only with unsigned?
+		for dx in [-1i8, 0] {
+			for dy in [-1i8, 0] {
+				let tile_mask = Board::tile_mask(mov.x + dx, mov.y + dy);
+				if tile_mask & mask_with_new_piece == tile_mask {
+					let mut tile = self.tile_at(Board::position_mask(mov.x + dx, mov.y + dy));
+					// We have to compute the missing value of our tile.
+					if mov.color == Color::Black {
+						tile |= 1 << -dx << -(2*dy); // TODO: make sure this works...
+					}
+					tiles.push_back(tile);
+				}
+
+			}
+		}
+
+		tiles
+	}
+
+	/**
+	 * Return the tile number at a given position. This method
+	 * assumes that the tile is full of pieces.
+	 */
+	const fn tile_at(&self, top_left: u64) -> u8 {
+		let mut tile = 0u8;
+		if top_left & self.black_mask != 0 { tile |= 1 }
+		if (top_left << 1) & self.black_mask != 0 { tile |= 2 }
+		if (top_left << 7) & self.black_mask != 0 { tile |= 4 }
+		if (top_left << 8) & self.black_mask != 0 { tile |= 8 }
+		tile
+	}
+
+	fn position_mask(x: i8, y: i8) -> u64 {
 		// TODO: detail why mask are 7x7 rather than 5x5
-		1u64 << (x + 7 + 1) << (7 * y)
+		1u64 << (x + 7 + 1) << (7 * (y + 1))
+	}
+
+	fn tile_mask(x: i8, y: i8) -> u64 {
+		/* A tile has four bits on, hence
+		 * we can represent it with a number
+		 * that we'll have to move exactly
+		 * like a position.
+		 *
+		 *   0 1 2 3 4 5 6
+		 *   7 8
+		 *
+		 * From the above grid, bits 0, 1, 7 and 8
+		 * will correspond to a tile on the first
+		 * place of our grid. Hence 387 is the
+		 * tile to move.
+		 */
+		387u64 << (x + 7 + 1) << (7 * (y + 1))
 	}
 }
 
@@ -170,7 +237,7 @@ impl std::fmt::Display for Board {
 			let mut line = String::new();
 
 			for y in 0..5 {
-				let position = Board::position(x, y);
+				let position = Board::position_mask(x, y);
 
 				if y > 0 { line.push_str(" "); }
 

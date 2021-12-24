@@ -1,5 +1,6 @@
 mod board;
 mod color;
+mod heuristic;
 mod mov;
 mod player;
 mod solver;

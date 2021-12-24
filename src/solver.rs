@@ -35,7 +35,12 @@ impl Solver {
 		// 	if alpha >= beta { return (beta, best_mov) }
 		// }
 
-		for mov in board.possible_moves() {
+		let moves = heuristic::sorted_moves(
+			board.possible_moves(),
+			board.current_player.favorite_color
+		);
+
+		for mov in moves {
 			let score = -self.negamax(board.next(mov), -beta, -alpha, depth - 1);
 			// println!("{:?} - {}", mov, score);
 			if score >= beta {
@@ -58,7 +63,12 @@ impl Solver {
 			return board.current_score()
 		}
 
-		for mov in board.possible_moves() {
+		let moves = heuristic::sorted_moves(
+			board.possible_moves(),
+			board.current_player.favorite_color
+		);
+
+		for mov in moves {
 			let score = -self.negamax(board.next(mov), -beta, -alpha, depth - 1);
 
 			if score >= beta {

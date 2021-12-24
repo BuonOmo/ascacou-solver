@@ -6,7 +6,7 @@ pub struct Board {
 	pieces_mask: u64,
 	black_mask:  u64,
 	white_mask:  u64,
-	current_player: Player,
+	pub current_player: Player,
 	player_1: Player,
 	player_2: Player
 }

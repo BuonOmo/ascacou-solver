@@ -1,9 +1,10 @@
-use crate::board::Board;
+use crate::board::{Board, Key};
 use crate::heuristic;
 use crate::mov::Move;
 
 struct Solver {
-	explored_positions: u128
+	explored_positions: u128,
+	transposition_table: std::collections::HashMap<Key, i8>
 }
 
 const MIN_SCORE: i8 = -100;
@@ -11,7 +12,7 @@ const MAX_SCORE: i8 = 100;
 
 impl Solver {
 	pub fn solve(board: Board, depth: Option<u8>) -> (i8, Option<Move>, u128) {
-		let mut solver = Solver { explored_positions: 0 };
+		let mut solver = Solver { explored_positions: 0, transposition_table: std::collections::HashMap::new() };
 
 		let (score, mov) = solver.negamax0(board, MIN_SCORE, MAX_SCORE, depth.unwrap_or(5));
 
@@ -60,7 +61,13 @@ impl Solver {
 	fn negamax(&mut self, board: Board, mut alpha: i8, mut beta: i8, depth: u8) -> i8 {
 		self.explored_positions += 1;
 
-		// TODO: detect terminal position.
+		let key = board.key();
+		// Reduce window by finding a transposition with a lower beta.
+		if let Some(cached_beta) = self.transposition_table.get(&key) {
+			if beta > *cached_beta {
+				beta = *cached_beta;
+			}
+		}
 
 		if depth == 0 {
 			return board.current_score()
@@ -68,7 +75,7 @@ impl Solver {
 
 		let possible_moves = board.possible_moves();
 
-		if possible_moves.is_empty() {
+		if possible_moves.is_empty() { /* terminal position */
 			return board.current_score();
 		}
 
@@ -89,6 +96,7 @@ impl Solver {
 			}
 		}
 
+		self.transposition_table.insert(key, alpha);
 		return alpha;
 	}
 }

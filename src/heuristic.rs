@@ -20,6 +20,8 @@ impl std::cmp::Ord for MoveScore {
 }
 
 pub fn sorted_moves(moves: Vec<Move>, favorite_color: Color) -> impl Iterator<Item=Move> {
+	// TODO(perf): consider a simpler data structure than a BinaryHeap since our estimate
+	// scores are fairly simple.
 	let mut heap =  std::collections::BinaryHeap::<MoveScore>::new();
 	for mov in moves {
 		heap.push(

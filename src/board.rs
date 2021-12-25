@@ -3,6 +3,11 @@ use crate::mov::Move;
 use crate::player::Player;
 use crate::tileset::TileSet;
 
+/**
+ * The size of a key representing a unique position.
+ */
+pub use u128 as Key;
+
 pub struct Board {
 	pieces_mask: u64,
 	black_mask:  u64,
@@ -69,6 +74,11 @@ impl Board {
 
 		Ok(Board { pieces_mask: (black_mask | white_mask),
 			black_mask, white_mask, player_1, player_2, current_player })
+	}
+
+
+	pub fn key(&self) -> Key { // TODO(memory perf): find a way to store key in a smaller size.
+		(self.pieces_mask as Key) | ((self.black_mask as Key) << 64)
 	}
 
 	pub fn possible_moves(&self) -> Vec<Move> {

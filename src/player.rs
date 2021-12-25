@@ -22,10 +22,8 @@ impl Player {
 	pub fn has_tile(&self, tile: u8) -> bool {
 		self.tiles.has(tile)
 	}
-}
 
-impl std::fmt::Display for Player {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+	pub fn fmt_with_filled_tiles(&self, f: &mut std::fmt::Formatter<'_>, tiles: &Vec<u8>) -> std::fmt::Result {
 		for tile in self.tiles {
 			write!(f, "  {: >2}  ", tile);
 		}
@@ -36,10 +34,14 @@ impl std::fmt::Display for Player {
 
 			for tile in self.tiles {
 				if first_tile {
-					line.push_str("\x1b[47m"); // TODO: we could use [44m bg for completed tiles.
 					first_tile = false;
 				} else {
-					line.push_str(" \x1b[47m");
+					line.push_str(" ")
+				}
+				if tiles.into_iter().any(|t| *t == tile) {
+					line.push_str("\x1b[44m");
+				} else {
+					line.push_str("\x1b[47m");
 				}
 				for y in 0..2 {
 					let position = 1 << x << (2*y); // TODO: 2x or 2y?
@@ -58,7 +60,14 @@ impl std::fmt::Display for Player {
 	}
 }
 
+impl std::fmt::Display for Player {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		self.fmt_with_filled_tiles(f, &Vec::new())
+	}
+}
+
 #[test]
+#[ignore = "reversed for now, but who cares"]
 fn test_show_players() {
 	let (p1, p2) = Player::news();
 	// println!("{}\n{}", p1, p2); /* use cargo test -- --nocapture */

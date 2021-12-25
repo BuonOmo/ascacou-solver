@@ -19,7 +19,7 @@ impl std::cmp::Ord for MoveScore {
 	fn cmp(&self, other: &Self) -> std::cmp::Ordering { self.1.cmp(&other.1) }
 }
 
-pub fn sorted_moves(moves: impl Iterator<Item=Move>, favorite_color: Color) -> impl Iterator<Item=Move> {
+pub fn sorted_moves(moves: Vec<Move>, favorite_color: Color) -> impl Iterator<Item=Move> {
 	let mut heap =  std::collections::BinaryHeap::<MoveScore>::new();
 	for mov in moves {
 		heap.push(

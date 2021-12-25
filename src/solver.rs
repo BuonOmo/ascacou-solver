@@ -28,15 +28,16 @@ impl Solver {
 			return (board.current_score(), None)
 		}
 
+		let possible_moves = board.possible_moves();
+
+		if possible_moves.is_empty() {
+			return (board.current_score(), None);
+		}
+
 		let mut best_mov: Option<Move> = None;
 
-		// if beta > current_score {
-		// 	beta = current_score;
-		// 	if alpha >= beta { return (beta, best_mov) }
-		// }
-
 		let moves = heuristic::sorted_moves(
-			board.possible_moves(),
+			possible_moves,
 			board.current_player.favorite_color
 		);
 
@@ -65,8 +66,14 @@ impl Solver {
 			return board.current_score()
 		}
 
+		let possible_moves = board.possible_moves();
+
+		if possible_moves.is_empty() {
+			return board.current_score();
+		}
+
 		let moves = heuristic::sorted_moves(
-			board.possible_moves(),
+			possible_moves,
 			board.current_player.favorite_color
 		);
 

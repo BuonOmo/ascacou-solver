@@ -71,8 +71,9 @@ impl Board {
 			black_mask, white_mask, player_1, player_2, current_player })
 	}
 
-	pub fn possible_moves(&self) -> impl Iterator<Item=Move> + '_ {
+	pub fn possible_moves(&self) -> Vec<Move> {
 		let mut result: Vec<Move> = Vec::with_capacity(50);
+		let mut at_least_one = false;
 
 		let tiles = TileSet::from(self.filled_tiles());
 
@@ -85,12 +86,13 @@ impl Board {
 					let mov = Move::new(x, y, color);
 					if self.already_played(&mov, &tiles) { continue }
 
+					at_least_one = true;
 					result.push(mov)
 				}
 			}
 		}
 
-		result.into_iter()
+		result
 	}
 
 	// TODO: a smarter score computation could be done by taking into
@@ -110,8 +112,8 @@ impl Board {
 		score
 	}
 
-	fn filled_tiles(&self) -> std::collections::LinkedList<u8> {
-		let mut filled_tiles: std::collections::LinkedList<u8> = std::collections::LinkedList::new();
+	fn filled_tiles(&self) -> Vec<u8> {
+		let mut filled_tiles: Vec<u8> = Vec::with_capacity(16);
 		// First, we retrieve every top-left corners of filled tiles
 		let mut mask = self.pieces_mask & (self.pieces_mask >> 1);
 		mask = mask & (mask >> 7);
@@ -122,7 +124,7 @@ impl Board {
 			let top_left = prev - mask;
 			// Then we find the tile value associated
 			// for each tile.
-			filled_tiles.push_back(self.tile_at(top_left));
+			filled_tiles.push(self.tile_at(top_left));
 		}
 		filled_tiles
 	}
@@ -150,6 +152,8 @@ impl Board {
 		}
 	}
 
+	// TODO(perf): maybe a simpler way to implement this algorithm is to play
+	// the move and only then check for duplicates.
 	fn already_played<'a>(&self, mov: &'a Move, exhausted_tiles: &'a TileSet) -> bool {
 		for tile in self.tiles_from(&mov) {
 			if exhausted_tiles.has(tile) { return true }
@@ -230,7 +234,8 @@ impl TryFrom<&str> for Board {
 
 impl std::fmt::Display for Board {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		writeln!(f, "{}", self.other_player())?;
+		let filled_tiles = self.filled_tiles();
+		self.other_player().fmt_with_filled_tiles(f, &filled_tiles)?;
 
 		writeln!(f, "   a b c d e")?;
 		for x in 0..5 {
@@ -251,8 +256,9 @@ impl std::fmt::Display for Board {
 			}
 			writeln!(f, "{} {} {} {}", x + 1, "\x1b[47m", line, "\x1b[0m")?;
 		}
+		writeln!(f, "");
+		self.current_player.fmt_with_filled_tiles(f, &filled_tiles)?;
 
-		writeln!(f, "\n{}", self.current_player)?;
 		Ok(())
 	}
 }

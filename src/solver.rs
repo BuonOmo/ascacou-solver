@@ -2,7 +2,7 @@ use crate::board::{Board, Key};
 use crate::heuristic;
 use crate::mov::Move;
 
-struct Solver {
+pub struct Solver {
 	explored_positions: u128,
 	transposition_table: std::collections::HashMap<Key, i8>
 }
@@ -11,16 +11,33 @@ const MIN_SCORE: i8 = -100;
 const MAX_SCORE: i8 = 100;
 
 impl Solver {
-	pub fn solve(board: Board, depth: Option<u8>) -> (i8, Option<Move>, u128) {
-		let mut solver = Solver { explored_positions: 0, transposition_table: std::collections::HashMap::new() };
+	fn new() -> Solver {
+		Solver { explored_positions: 0, transposition_table: std::collections::HashMap::new() }
+	}
+	pub fn solve(board: &Board, depth: Option<u8>) -> (i8, Option<Move>, u128) {
+		let mut solver = Solver::new();
 
 		let (score, mov) = solver.negamax0(board, MIN_SCORE, MAX_SCORE, depth.unwrap_or(5));
 
 		(score, mov, solver.explored_positions)
 	}
 
-	// TODO: transposition tables.
-	fn negamax0(&mut self, board: Board, mut alpha: i8, mut beta: i8, depth: u8) -> (i8, Option<Move>) {
+	pub fn move_scores(board: &Board, depth: Option<u8>) -> Vec<(Move, i8)> {
+		let mut solver = Solver::new();
+
+		let mut move_scores = Vec::with_capacity(50);
+
+		for mov in board.possible_moves() {
+			move_scores.push(
+				(mov, -solver.negamax(board.next(mov), MIN_SCORE, MAX_SCORE, depth.unwrap_or(5)))
+			);
+		}
+
+		move_scores.sort_by_key(|(mov, score)| -score);
+		move_scores
+	}
+
+	fn negamax0(&mut self, board: &Board, mut alpha: i8, mut beta: i8, depth: u8) -> (i8, Option<Move>) {
 		self.explored_positions += 1;
 
 		// let current_score = board.current_score();
@@ -110,18 +127,29 @@ mod tests {
 		let board = Board::from_fen("1wbw/2b/1bb/5/5").unwrap();
 		println!("{}", board);
 		assert_eq!(
-			Solver::solve(board, Some(1)),
+			Solver::solve(&board, Some(1)),
 			(1, Some(Move::white(1, 3)), 39)
 		)
 	}
 
 	#[test]
+	fn test_solve_ending() { // TODO: maybe rename to test with any depth.
+		let board = Board::from_fen("wwwbb/bwbwb/bbbww/bbwww/w").unwrap();
+		println!("{}", board);
+		assert_eq!(
+			Solver::solve(&board, Some(100)),
+			(1, Some(Move::white(1, 3)), 39)
+		)
+	}
+
+	#[test]
+	#[ignore = "too slow, shall be used as a benchmark."]
 	fn depths() {
 		for i in 1..25 {
 			// let board = Board::from_fen("5/5/5/5/5").unwrap();
 			let board = Board::from_fen("1wbw/2b/1bb/5/5").unwrap();
 			let now = std::time::Instant::now();
-			let (.., explored_positions) = Solver::solve(board, Some(i));
+			let (.., explored_positions) = Solver::solve(&board, Some(i));
 			let duration = now.elapsed().as_secs_f32();
 			let message = format!(
 				"Depth {} took {} seconds to explore {} positions.",

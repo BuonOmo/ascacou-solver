@@ -35,7 +35,7 @@ impl Move {
  * Some valid moves: `a1`, `E5`, `D2`.
  * Some invalid moves: `1a`, `F5`, `d6`.
  */
-impl TryFrom<&str> for Move {
+impl TryFrom<&str> for Move { // TODO: fix letter ordering
 	type Error = &'static str;
 
 	fn try_from(s: &str) -> Result<Move, Self::Error> {
@@ -62,5 +62,35 @@ impl TryFrom<&str> for Move {
 		};
 
 		Ok(Move { x: x, y: y, color: color })
+	}
+}
+impl std::convert::TryFrom<String> for Move {
+	type Error = &'static str;
+    fn try_from(input: String) -> Result<Self, Self::Error> {
+        Move::try_from(input.as_ref())
+    }
+}
+
+impl std::fmt::Display for Move {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		let chr = match (self.color, self.x) {
+			(Color::Black, 0) => 'a', (Color::White, 0) => 'A',
+			(Color::Black, 1) => 'b', (Color::White, 1) => 'B',
+			(Color::Black, 2) => 'c', (Color::White, 2) => 'C',
+			(Color::Black, 3) => 'd', (Color::White, 3) => 'D',
+			(Color::Black, 4) => 'e', (Color::White, 4) => 'E',
+			_ => return Err(std::fmt::Error)
+		};
+
+		let num = match self.y {
+			0 => '1',
+			1 => '2',
+			2 => '3',
+			3 => '4',
+			4 => '5',
+			_ => return Err(std::fmt::Error)
+		};
+
+		write!(f, "{}{}", chr, num)
 	}
 }

@@ -18,6 +18,12 @@ pub struct Board {
 }
 
 impl Board {
+	pub fn empty() -> Board {
+		let (player_1, player_2) = Player::news();
+		Board { pieces_mask: 0, black_mask: 0, white_mask: 0,
+			current_player: player_1, player_1: player_1, player_2: player_2, }
+	}
+
 	/**
 	 * Any Ascacou position may quite simply be described by a PGN
 	 * like notation. For instance:
@@ -76,8 +82,29 @@ impl Board {
 			black_mask, white_mask, player_1, player_2, current_player })
 	}
 
+	fn fen(&self) -> String {
+		let mut idx = 0;
+		let mut str = String::new();
+		for x in 0..5 {
+			if x > 0 { str.push_str("/") }
+			for y in 0..5 {
+				if Board::position_mask(x, y) & self.pieces_mask == 0 {
+					idx += 1;
+					continue
+				}
 
-	pub fn key(&self) -> Key { // TODO(memory perf): find a way to store key in a smaller size.
+				if idx > 0 { str += &idx.to_string(); idx = 0 }
+				str.push_str(
+					if Board::position_mask(x, y) & self.black_mask == 0 { "w" } else { "b" }
+				)
+			}
+			if idx > 0 { str += &idx.to_string(); idx = 0 }
+		}
+		str
+	}
+
+
+	pub fn key(&self) -> Key { // TODO(memory perf): find a way to store key in a smaller size (see patch ':/u64 key').
 		(self.pieces_mask as Key) | ((self.black_mask as Key) << 64)
 	}
 
@@ -244,6 +271,8 @@ impl TryFrom<&str> for Board {
 
 impl std::fmt::Display for Board {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		writeln!(f, "{}", self.fen());
+
 		let filled_tiles = self.filled_tiles();
 		self.other_player().fmt_with_filled_tiles(f, &filled_tiles)?;
 

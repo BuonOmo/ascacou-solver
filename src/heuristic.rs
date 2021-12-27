@@ -1,3 +1,5 @@
+// TODO: add impossible moves to heuristic.
+// TODO: add moves left to complete a card to the IA.
 use crate::board::Board;
 use crate::color::Color;
 use crate::mov::Move;

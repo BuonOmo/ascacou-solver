@@ -110,7 +110,6 @@ impl Board {
 
 	pub fn possible_moves(&self) -> Vec<Move> {
 		let mut result: Vec<Move> = Vec::with_capacity(50);
-		let mut at_least_one = false;
 
 		let tiles = TileSet::from(self.filled_tiles());
 
@@ -123,7 +122,6 @@ impl Board {
 					let mov = Move::new(x, y, color);
 					if self.already_played(&mov, &tiles) { continue }
 
-					at_least_one = true;
 					result.push(mov)
 				}
 			}

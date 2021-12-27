@@ -27,24 +27,24 @@ impl Game {
 			// 	println!("— {} ({})", mov, score);
 			// 	if i == 0 { break }
 			// }
-			if let (score, Some(mov), _) = Solver::solve(&self.board, Some(12)) {
+			if let (score, Some(mov), _) = Solver::solve(&self.board, Some(5)) {
 				println!("IA top move: {} ({})", mov, score);
 			}
 
 			println!("\nYour move (A1 / e5) (black: lower / white: UPPER):");
 
-			let mov = Game::read_move();
+			let mov = self.read_move();
 
 			self.board = self.board.next(mov);
 		}
 	}
 
-	fn read_move() -> Move {
+	fn read_move(&self) -> Move {
 		let mut mov_str = String::new();
 		while let None = std::io::stdin().read_line(&mut mov_str).ok() {};
 		match Move::try_from(mov_str) {
-			Err(_) => Game::read_move(),
-			Ok(mov) => mov // TODO: only accept if possible
+			Ok(mov) if self.board.possible_moves().contains(&mov) => mov,
+			_ => self.read_move(),
 		}
 	}
 }

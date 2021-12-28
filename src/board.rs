@@ -13,73 +13,103 @@ pub struct Board {
 	black_mask:  u64,
 	white_mask:  u64,
 	pub current_player: Player,
-	player_1: Player,
-	player_2: Player
+	opponent: Player
 }
 
 impl Board {
 	pub fn empty() -> Board {
-		let (player_1, player_2) = Player::news();
+		let (current_player, opponent) = Player::default_set();
 		Board { pieces_mask: 0, black_mask: 0, white_mask: 0,
-			current_player: player_1, player_1: player_1, player_2: player_2, }
+			current_player, opponent }
 	}
 
 	/**
 	 * Any Ascacou position may quite simply be described by a PGN
 	 * like notation. For instance:
 	 *
-	 *     a  b  c  d  e
-	 *   1    W  B  W
-	 *   2       B
-	 *   3    W  W
-	 *   4
-	 *   5
+	 *       a  b  c  d  e
+	 *     1    W  B  W
+	 *     2       B
+	 *     3    W  W
+	 *     4
+	 *     5
 	 *
 	 * Could be refered to as `c2 B3 B1 C3 c1 D1`. This strings
 	 * gives us the information of move order, and the case tells
 	 * the color (white is upper cased).
 	 *
 	 * If we don't care about move order we can also have a FEN
-	 * like reference: `1wbw/2b/1ww/5/5`.
+	 * like reference: `1wbw/2b/1ww/5/5`. Note that we are starting
+	 * from the top-left corner.
 	 *
-	 * TODO: a structure that handles players positions.
+	 * An ascacou position must also be aware of which tiles the
+	 * current player has. Since we are able to represent tiles
+	 * with number between 0 and 15, we can represent a set of
+	 * 8 tiles with 8 hexadecimal numbers. Those shall be the
+	 * tiles of the current player, their opponent will have
+	 * the 8 numbers left.
+	 *
+	 * So a full FEN may look like: 1wbw/2b/1ww/5/5 03478bcd.
+	 *
+	 * A Tile number is made by looking at the black pieces in a tile
+	 * representation. These black pieces will represent bits that are
+	 * on in our number, in the order indicated below.
+	 *
+	 *     1 2
+	 *     3 4
 	 */
 	pub fn from_fen(fen: &str) -> Result<Board, &'static str> {
 		let mut black_mask =  0u64;
 		let mut white_mask =  0u64;
 
 		let mut x = 0;
-		let mut y: i8;
-		let mut moves = 0;
+		let mut y = 0;
 
-		for line in fen.split('/') {
-			if x > 4 { return Err("out of bound") }
+		let mut chars = fen.chars().peekable();
 
-			y = 0;
-			for chr in line.chars() {
-				if y > 4 { return Err("out of bound") }
-
-				match chr {
-					'b' => { moves += 1; black_mask |= Board::position_mask(x, y) },
-					'w' => { moves += 1; white_mask |= Board::position_mask(x, y) },
-					'1' => y += 0,
-					'2' => y += 1,
-					'3' => y += 2,
-					'4' => y += 3,
-					'5' => y += 4,
-					_ => return Err("invalid character")
-				}
-
-				y += 1;
+		// Board part.
+		while let Some(chr) = chars.next() {
+			match chr {
+				' ' if x < 4 => return Err("Not enough rows"),
+				' ' => break,
+				'/' if x == 4 => return Err("Too much rows"),
+				'/' if y > 4 => return Err("Too much cols"),
+				'/' => { x += 1; y = 0 }
+				'1' => y += 0,
+				'2' => y += 1,
+				'3' => y += 2,
+				'4' => y += 3,
+				'5' => y += 4,
+				'b' => black_mask |= Board::position_mask(x, y),
+				'w' => white_mask |= Board::position_mask(x, y),
+				_ => return Err("invalid character")
 			}
-			x += 1;
 		}
 
-		let (player_1, player_2) = Player::news();
-		let current_player = if moves % 2 == 0 { player_1 } else { player_2 };
+		if chars.peek().is_none() {
+			return Err("Incomplete FEN")
+		}
+
+		// Tiles part.
+
+		let mut tiles = [0; 8];
+		let mut i = 0;
+		while let Some(chr) = chars.next() {
+			match chr.to_digit(16) {
+				// No need for a guard there, digit may not be greater than 15.
+				Some(digit) => tiles[i] = digit as u8,
+				None => return Err("invalid character")
+			}
+			if i > 7 { return Err("Too much tiles") }
+			i += 1;
+		}
+
+		if i < 7 { return Err("Not enough tiles") }
+
+		let (current_player, opponent) = Player::from_current_tiles(tiles);
 
 		Ok(Board { pieces_mask: (black_mask | white_mask),
-			black_mask, white_mask, player_1, player_2, current_player })
+			black_mask, white_mask, current_player, opponent })
 	}
 
 	fn fen(&self) -> String {
@@ -164,14 +194,6 @@ impl Board {
 		filled_tiles
 	}
 
-	pub fn other_player(&self) -> Player {
-		if self.current_player == self.player_1 {
-			self.player_2
-		} else {
-			self.player_1
-		}
-	}
-
 	/**
 	 * Apply a move without checking for its validity.
 	 */
@@ -181,9 +203,8 @@ impl Board {
 			pieces_mask: self.pieces_mask | pos,
 			white_mask: if mov.color == Color::White { self.white_mask | pos } else { self.white_mask },
 			black_mask: if mov.color == Color::Black { self.black_mask | pos } else { self.black_mask },
-			current_player: if self.current_player == self.player_1 { self.player_2 } else { self.player_1 },
-			player_1: self.player_1,
-			player_2: self.player_2,
+			current_player: self.opponent,
+			opponent: self.current_player
 		}
 	}
 
@@ -272,7 +293,7 @@ impl std::fmt::Display for Board {
 		writeln!(f, "{}", self.fen());
 
 		let filled_tiles = self.filled_tiles();
-		self.other_player().fmt_with_filled_tiles(f, &filled_tiles)?;
+		self.opponent.fmt_with_filled_tiles(f, &filled_tiles)?;
 
 		writeln!(f, "   a b c d e")?;
 		for x in 0..5 {

@@ -147,7 +147,7 @@ mod tests {
 	fn depths() {
 		for i in 1..25 {
 			// let board = Board::from_fen("5/5/5/5/5").unwrap();
-			let board = Board::from_fen("1wbw/2b/1bb/5/5").unwrap();
+			let board = Board::from_fen("1wbw/2b/1bb/5/5 01234567").unwrap();
 			let now = std::time::Instant::now();
 			let (.., explored_positions) = Solver::solve(&board, Some(i));
 			let duration = now.elapsed().as_secs_f32();

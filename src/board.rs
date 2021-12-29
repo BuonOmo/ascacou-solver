@@ -130,7 +130,8 @@ impl Board {
 			}
 			if idx > 0 { str += &idx.to_string(); idx = 0 }
 		}
-		str
+
+		format!("{} {}", str, self.current_player.fen_part())
 	}
 
 
@@ -242,7 +243,7 @@ impl Board {
 					let mut tile = self.tile_at(Board::position_mask(mov.x + dx, mov.y + dy));
 					// We have to compute the missing value of our tile.
 					if mov.color == Color::Black {
-						tile |= 1 << -(2*dy) << -dx;
+						tile |= 1 << -2 * dy << -dx;
 					}
 					tiles.push(tile);
 				}
@@ -305,9 +306,9 @@ impl Board {
 		}
 		// See position_mask for the 7x7 board size explanation.
 		if num_rows < 0 {
-			mask >> -(7 * num_rows)
+			mask >> -7 * num_rows
 		} else {
-			mask << (7 * num_rows)
+			mask << 7 * num_rows
 		}
 	}
 

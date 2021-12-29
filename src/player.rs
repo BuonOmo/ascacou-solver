@@ -46,6 +46,13 @@ impl Player {
 		self.tiles.has(tile)
 	}
 
+	pub fn fen_part(&self) -> String {
+		self.tiles
+			.into_iter()
+			.map(|tile|tile.to_string())
+			.collect::<String>()
+	}
+
 	pub fn fmt_with_filled_tiles(&self, f: &mut std::fmt::Formatter<'_>, tiles: &Vec<u8>) -> std::fmt::Result {
 		for tile in self.tiles {
 			write!(f, "  {: >2}  ", tile)?;
@@ -68,7 +75,7 @@ impl Player {
 				}
 				for x in 0..2 {
 					// Tiles are counted horizontally starting at top left.
-					let position = 1 << x << (2 * y);
+					let position = 1 << x << 2 * y;
 
 					if tile & position != 0 {
 						line.push_str(" \x1b[30m●");

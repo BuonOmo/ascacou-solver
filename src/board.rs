@@ -59,29 +59,29 @@ impl Board {
 	 *     3 4
 	 */
 	pub fn from_fen(fen: &str) -> Result<Board, &'static str> {
-		let mut black_mask =  0u64;
-		let mut white_mask =  0u64;
+		let mut black_mask = 0u64;
+		let mut white_mask = 0u64;
 
-		let mut x = 0;
-		let mut y = 0;
+		let mut x = 0; // Column
+		let mut y = 0; // Row
 
 		let mut chars = fen.chars().peekable();
 
 		// Board part.
 		while let Some(chr) = chars.next() {
 			match chr {
-				' ' if x < 4 => return Err("Not enough rows"),
+				' ' if y < 4 => return Err("Not enough rows"),
 				' ' => break,
-				'/' if x == 4 => return Err("Too much rows"),
-				'/' if y > 4 => return Err("Too much cols"),
-				'/' => { x += 1; y = 0 }
-				'1' => y += 0,
-				'2' => y += 1,
-				'3' => y += 2,
-				'4' => y += 3,
-				'5' => y += 4,
-				'b' => black_mask |= Board::position_mask(x, y),
-				'w' => white_mask |= Board::position_mask(x, y),
+				'/' if y == 4 => return Err("Too much rows"),
+				'/' if x > 5 => return Err("Too much cols"),
+				'/' => { y += 1; x = 0 }
+				'1' => x += 1,
+				'2' => x += 2,
+				'3' => x += 3,
+				'4' => x += 4,
+				'5' => x += 5,
+				'b' => {black_mask |= Board::position_mask(x, y); x += 1},
+				'w' => {white_mask |= Board::position_mask(x, y); x += 1},
 				_ => return Err("invalid character")
 			}
 		}
@@ -115,9 +115,9 @@ impl Board {
 	fn fen(&self) -> String {
 		let mut idx = 0;
 		let mut str = String::new();
-		for x in 0..5 {
-			if x > 0 { str.push_str("/") }
-			for y in 0..5 {
+		for y in 0..5 {
+			if y > 0 { str.push_str("/") }
+			for x in 0..5 {
 				if Board::position_mask(x, y) & self.pieces_mask == 0 {
 					idx += 1;
 					continue
@@ -162,7 +162,8 @@ impl Board {
 
 	// TODO: a smarter score computation could be done by taking into
 	// account each player's score, and give a greater edge to a position
-	// close to terminal.
+	// close to terminal. More interesting even is the idea of taking into
+	// account partially filled tiles.
 	pub fn current_score(&self) -> i8 {
 		let mut score = 0;
 
@@ -177,6 +178,13 @@ impl Board {
 		score
 	}
 
+	/**
+	 * Find every filled tiles using bit computation.
+	 * If n is the number of filled tiles, this method
+	 * is o(n), it is still quite computation heavy since
+	 * we have to call `tile_at()` for each filled tile.
+	 * Hence cost is roughly: 2 + 6 * n operations.
+	 */
 	fn filled_tiles(&self) -> Vec<u8> {
 		let mut filled_tiles: Vec<u8> = Vec::with_capacity(16);
 		// First, we retrieve every top-left corners of filled tiles
@@ -221,22 +229,22 @@ impl Board {
 	 * From a empty square, checks which tiles could be created if we play
 	 * a given move. This function doesn't check for emptiness of the square.
 	 */
-	fn tiles_from<'a>(&self, mov: &'a Move) -> std::collections::LinkedList<u8> {
-		let mut tiles = std::collections::LinkedList::new();
+	fn tiles_from<'a>(&self, mov: &'a Move) -> Vec<u8> {
+		let mut tiles = Vec::with_capacity(4);
 		let pos = Board::position_mask(mov.x, mov.y);
 		let mask_with_new_piece = self.pieces_mask | pos;
 
 		// TODO(refacto): consider using bottom right rather than top left to work only with unsigned?
-		for dx in [-1i8, 0] {
-			for dy in [-1i8, 0] {
+		for dy in [-1i8, 0] {
+			for dx in [-1i8, 0] {
 				let tile_mask = Board::tile_mask(mov.x + dx, mov.y + dy);
 				if tile_mask & mask_with_new_piece == tile_mask {
 					let mut tile = self.tile_at(Board::position_mask(mov.x + dx, mov.y + dy));
 					// We have to compute the missing value of our tile.
 					if mov.color == Color::Black {
-						tile |= 1 << -dx << -(2*dy); // TODO: make sure this works...
+						tile |= 1 << -(2*dy) << -dx;
 					}
-					tiles.push_back(tile);
+					tiles.push(tile);
 				}
 
 			}
@@ -259,8 +267,15 @@ impl Board {
 	}
 
 	fn position_mask(x: i8, y: i8) -> u64 {
-		// TODO: detail why mask are 7x7 rather than 5x5
-		1u64 << (x + 7 + 1) << (7 * (y + 1))
+		/* Masks are 7x7 rather than 5x5 to allow simpler bitboard
+		 * computation. This means that when we shift bits by N row
+		 * or column, they will fall in an unchecked area we don't
+		 * care about. Note that this was an implementation choice
+		 * beforehand, and it may be reduced to optimize storage.
+		 *
+		 * With that said, our first (x, y) should start at bit 8.
+		 */
+		Board::shift_rows(Board::shift_cols(256u64, x), y)
 	}
 
 	fn tile_mask(x: i8, y: i8) -> u64 {
@@ -269,15 +284,46 @@ impl Board {
 		 * that we'll have to move exactly
 		 * like a position.
 		 *
-		 *   0 1 2 3 4 5 6
-		 *   7 8
+		 *    0  1  2  3  4  5  6
+		 *    7  8  9 10 11 12 13
+		 *   14 15 16 ...
 		 *
-		 * From the above grid, bits 0, 1, 7 and 8
+		 * From the above grid, bits 8, 9, 15 and 16
 		 * will correspond to a tile on the first
-		 * place of our grid. Hence 387 is the
+		 * place of our grid. Hence 99072 is the
 		 * tile to move.
 		 */
-		387u64 << (x + 7 + 1) << (7 * (y + 1))
+		Board::shift_rows(Board::shift_cols(99072u64, x), y)
+	}
+
+	fn shift_rows(mask: u64, num_rows: i8) -> u64 {
+		#[cfg(debug_assertions)]
+		{
+			assert!(
+				-5 < num_rows && num_rows < 5
+			)
+		}
+		// See position_mask for the 7x7 board size explanation.
+		if num_rows < 0 {
+			mask >> -(7 * num_rows)
+		} else {
+			mask << (7 * num_rows)
+		}
+	}
+
+	fn shift_cols(mask: u64, num_cols: i8) -> u64 {
+		#[cfg(debug_assertions)]
+		{
+			assert!(
+				-5 < num_cols && num_cols < 5
+			)
+		}
+		// See position_mask for the 7x7 board size explanation.
+		if num_cols < 0 {
+			mask >> -num_cols
+		} else {
+			mask << num_cols
+		}
 	}
 }
 
@@ -290,19 +336,19 @@ impl TryFrom<&str> for Board {
 
 impl std::fmt::Display for Board {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		writeln!(f, "{}", self.fen());
+		writeln!(f, "{}", self.fen())?;
 
 		let filled_tiles = self.filled_tiles();
 		self.opponent.fmt_with_filled_tiles(f, &filled_tiles)?;
 
 		writeln!(f, "   a b c d e")?;
-		for x in 0..5 {
+		for y in 0..5 {
 			let mut line = String::new();
 
-			for y in 0..5 {
+			for x in 0..5 {
 				let position = Board::position_mask(x, y);
 
-				if y > 0 { line.push_str(" "); }
+				if x > 0 { line.push_str(" "); }
 
 				if self.pieces_mask & position == 0 {
 					line.push_str("\x1b[30m·");
@@ -312,9 +358,9 @@ impl std::fmt::Display for Board {
 					line.push_str("\x1b[31m●");
 				}
 			}
-			writeln!(f, "{} {} {} {}", x + 1, "\x1b[47m", line, "\x1b[0m")?;
+			writeln!(f, "{} {} {} {}", y + 1, "\x1b[47m", line, "\x1b[0m")?;
 		}
-		writeln!(f, "");
+		writeln!(f, "")?;
 		self.current_player.fmt_with_filled_tiles(f, &filled_tiles)?;
 
 		Ok(())
@@ -359,5 +405,35 @@ mod tests {
 			Board::from_fen("1wbw/2bb/1bb/5/5").unwrap().current_score(),
 			1 // score for p2
 		);
+	}
+
+	#[test]
+	fn tiles_from() {
+		let mov = Move::try_from("D2").unwrap();
+		let board = Board::from_fen("2wwb/2w1b/2wbb/5/5 01234567").unwrap();
+		println!("{}\nChecking tiles from move {}", board, mov);
+		assert_eq!(
+			board.tiles_from(&mov),
+			vec![0, 10, 8, 14]
+		)
+	}
+
+	#[test]
+	fn position_mask() {
+		assert_eq!(
+			Board::position_mask(0, 0),
+			1u64 << 8,
+			"position (0, 0) is incorrect"
+		);
+		assert_eq!(
+			Board::position_mask(1, 0),
+			1u64 << 9,
+			"position (1, 0) is incorrect"
+		);
+		assert_eq!(
+			Board::position_mask(0, 1),
+			1u64 << 15,
+			"position (0, 1) is incorrect"
+		)
 	}
 }

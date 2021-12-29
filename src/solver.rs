@@ -33,11 +33,11 @@ impl Solver {
 			);
 		}
 
-		move_scores.sort_by_key(|(mov, score)| -score);
+		move_scores.sort_by_key(|(_mov, score)| -score);
 		move_scores
 	}
 
-	fn negamax0(&mut self, board: &Board, mut alpha: i8, mut beta: i8, depth: u8) -> (i8, Option<Move>) {
+	fn negamax0(&mut self, board: &Board, mut alpha: i8, beta: i8, depth: u8) -> (i8, Option<Move>) {
 		self.explored_positions += 1;
 
 		// let current_score = board.current_score();
@@ -102,6 +102,14 @@ impl Solver {
 		);
 
 		for mov in moves {
+			// TODO(perf): we could have the board being part of the solver as mutable, and
+			//  have a function to make a move and unmake a move. This way we would not
+			//  instanciate any new board, may be much more performant.
+			//
+			//  eg:
+			//  self.board.make_move(move)
+			//  let score = ...
+			//  self.board.rewind_move(move)
 			let score = -self.negamax(board.next(mov), -beta, -alpha, depth - 1);
 
 			if score >= beta {

@@ -35,7 +35,7 @@ impl Move {
  * Some valid moves: `a1`, `E5`, `D2`.
  * Some invalid moves: `1a`, `F5`, `d6`.
  */
-impl TryFrom<&str> for Move { // TODO: fix letter ordering
+impl TryFrom<&str> for Move {
 	type Error = &'static str;
 
 	fn try_from(s: &str) -> Result<Move, Self::Error> {

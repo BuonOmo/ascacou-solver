@@ -48,10 +48,10 @@ impl Player {
 
 	pub fn fmt_with_filled_tiles(&self, f: &mut std::fmt::Formatter<'_>, tiles: &Vec<u8>) -> std::fmt::Result {
 		for tile in self.tiles {
-			write!(f, "  {: >2}  ", tile);
+			write!(f, "  {: >2}  ", tile)?;
 		}
-		writeln!(f, "");
-		for x in 0..2 {
+		writeln!(f, "")?;
+		for y in 0..2 {
 			let mut line = String::new();
 			let mut first_tile = true;
 
@@ -66,9 +66,9 @@ impl Player {
 				} else {
 					line.push_str("\x1b[47m");
 				}
-				for y in 0..2 {
-					// TODO: count tiles horizontally, starting at top left.
-					let position = 1 << x << (2*y); // TODO: 2x or 2y?
+				for x in 0..2 {
+					// Tiles are counted horizontally starting at top left.
+					let position = 1 << x << (2 * y);
 
 					if tile & position != 0 {
 						line.push_str(" \x1b[30m●");
@@ -78,7 +78,7 @@ impl Player {
 				}
 				line.push_str(" \x1b[0m");
 			}
-			writeln!(f, "{}", line);
+			writeln!(f, "{}", line)?;
 		}
 		Ok(())
 	}
@@ -91,15 +91,8 @@ impl std::fmt::Display for Player {
 }
 
 #[test]
-#[ignore = "reversed for now, but who cares"]
+#[ignore = "purely visual test (cargo test -- --nocapture test_show)"]
 fn test_show_players() {
 	let (p1, p2) = Player::default_set();
-	// println!("{}\n{}", p1, p2); /* use cargo test -- --nocapture */
-	assert_eq!(
-		format!("{}\n{}", p1, p2),
-		"\
-\u{1b}[47m \u{1b}[31m● \u{1b}[31m● \u{1b}[0m \u{1b}[47m \u{1b}[30m● \u{1b}[31m● \u{1b}[0m \u{1b}[47m \u{1b}[31m● \u{1b}[30m● \u{1b}[0m \u{1b}[47m \u{1b}[30m● \u{1b}[30m● \u{1b}[0m \u{1b}[47m \u{1b}[31m● \u{1b}[31m● \u{1b}[0m \u{1b}[47m \u{1b}[30m● \u{1b}[31m● \u{1b}[0m \u{1b}[47m \u{1b}[31m● \u{1b}[30m● \u{1b}[0m \u{1b}[47m \u{1b}[30m● \u{1b}[30m● \u{1b}[0m\n\u{1b}[47m \u{1b}[31m● \u{1b}[31m● \u{1b}[0m \u{1b}[47m \u{1b}[31m● \u{1b}[31m● \u{1b}[0m \u{1b}[47m \u{1b}[31m● \u{1b}[31m● \u{1b}[0m \u{1b}[47m \u{1b}[31m● \u{1b}[31m● \u{1b}[0m \u{1b}[47m \u{1b}[30m● \u{1b}[31m● \u{1b}[0m \u{1b}[47m \u{1b}[30m● \u{1b}[31m● \u{1b}[0m \u{1b}[47m \u{1b}[30m● \u{1b}[31m● \u{1b}[0m \u{1b}[47m \u{1b}[30m● \u{1b}[31m● \u{1b}[0m\n\n\u{1b}[47m \u{1b}[30m● \u{1b}[30m● \u{1b}[0m \u{1b}[47m \u{1b}[31m● \u{1b}[30m● \u{1b}[0m \u{1b}[47m \u{1b}[30m● \u{1b}[31m● \u{1b}[0m \u{1b}[47m \u{1b}[31m● \u{1b}[31m● \u{1b}[0m \u{1b}[47m \u{1b}[30m● \u{1b}[30m● \u{1b}[0m \u{1b}[47m \u{1b}[31m● \u{1b}[30m● \u{1b}[0m \u{1b}[47m \u{1b}[30m● \u{1b}[31m● \u{1b}[0m \u{1b}[47m \u{1b}[31m● \u{1b}[31m● \u{1b}[0m
-\u{1b}[47m \u{1b}[30m● \u{1b}[30m● \u{1b}[0m \u{1b}[47m \u{1b}[30m● \u{1b}[30m● \u{1b}[0m \u{1b}[47m \u{1b}[30m● \u{1b}[30m● \u{1b}[0m \u{1b}[47m \u{1b}[30m● \u{1b}[30m● \u{1b}[0m \u{1b}[47m \u{1b}[31m● \u{1b}[30m● \u{1b}[0m \u{1b}[47m \u{1b}[31m● \u{1b}[30m● \u{1b}[0m \u{1b}[47m \u{1b}[31m● \u{1b}[30m● \u{1b}[0m \u{1b}[47m \u{1b}[31m● \u{1b}[30m● \u{1b}[0m
-"
-	);
+	println!("{}\n{}", p1, p2); /* use cargo test -- --nocapture */
 }

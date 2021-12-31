@@ -1,14 +1,6 @@
-mod board;
-mod color;
-mod game;
-mod heuristic;
-mod mov;
-mod player;
-mod solver;
-mod tileset;
 
-use crate::game::Game;
-use crate::board::Board;
+use ascacou_solver::game::Game;
+use ascacou_solver::board::Board;
 
 fn main() {
     for i in 0..=9 {

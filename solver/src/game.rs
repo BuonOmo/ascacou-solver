@@ -31,7 +31,7 @@ impl Game {
 				println!("IA top move: {} ({})", mov, score);
 			}
 
-			println!("\nYour move (A1 / e5) (black: lower / white: UPPER):");
+			println!("\nYour move (ba1 = black to the first row/col):");
 
 			let mov = self.read_move();
 

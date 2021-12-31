@@ -22,18 +22,27 @@ impl Move {
 	pub fn white(x: i8, y: i8) -> Move {
 		Move::new(x, y, Color::White)
 	}
+
+	pub fn is_black(&self) -> bool {
+		self.color == Color::Black
+	}
+
+	pub fn is_white(&self) -> bool {
+		self.color == Color::White
+	}
 }
 
 /**
  * Moves should be written with two characters.
  *
- * 1. the color and x axis is represented with a
- *    letter. Uppercase means white, lower black,
- *    its alphabetical appearance is the x axis.
- * 2. A digit, representing the y axis.
+ * 1. the piece is represented by b for black,
+ *    w for white.
+ * 2. the x axis is represented with a letter, its
+ *    alphabetical appearance is the x axis.
+ * 3. A digit, representing the y axis.
  *
- * Some valid moves: `a1`, `E5`, `D2`.
- * Some invalid moves: `1a`, `F5`, `d6`.
+ * Some valid moves: `wA1`, `Be5`, `bd2`.
+ * Some invalid moves: `w1a`, `wf5`, `bd6`.
  */
 impl TryFrom<&str> for Move {
 	type Error = &'static str;
@@ -41,12 +50,19 @@ impl TryFrom<&str> for Move {
 	fn try_from(s: &str) -> Result<Move, Self::Error> {
 		let mut chars = s.chars();
 
-		let (color, x) = match chars.next() {
-			Some('a') => (Color::Black, 0), Some('A') => (Color::White, 0),
-			Some('b') => (Color::Black, 1), Some('B') => (Color::White, 1),
-			Some('c') => (Color::Black, 2), Some('C') => (Color::White, 2),
-			Some('d') => (Color::Black, 3), Some('D') => (Color::White, 3),
-			Some('e') => (Color::Black, 4), Some('E') => (Color::White, 4),
+		let color = match chars.next() {
+			Some('b' | 'B') => Color::Black,
+			Some('w' | 'W') => Color::White,
+			Some(_) => return Err("wrong color"),
+			None => return Err("missing information"),
+		};
+
+		let x = match chars.next() {
+			Some('a' | 'A') => 0,
+			Some('b' | 'B') => 1,
+			Some('c' | 'C') => 2,
+			Some('d' | 'D') => 3,
+			Some('e' | 'E') => 4,
 			Some(_) => return Err("wrong x"),
 			None => return Err("missing information"),
 		};
@@ -73,16 +89,22 @@ impl std::convert::TryFrom<String> for Move {
 
 impl std::fmt::Display for Move {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		let chr = match (self.color, self.x) {
-			(Color::Black, 0) => 'a', (Color::White, 0) => 'A',
-			(Color::Black, 1) => 'b', (Color::White, 1) => 'B',
-			(Color::Black, 2) => 'c', (Color::White, 2) => 'C',
-			(Color::Black, 3) => 'd', (Color::White, 3) => 'D',
-			(Color::Black, 4) => 'e', (Color::White, 4) => 'E',
+
+		let piece = match self.color {
+			Color::Black => 'b',
+			Color::White => 'w'
+		};
+
+		let col = match self.x {
+			0 => 'a',
+			1 => 'b',
+			2 => 'c',
+			3 => 'd',
+			4 => 'e',
 			_ => return Err(std::fmt::Error)
 		};
 
-		let num = match self.y {
+		let row = match self.y {
 			0 => '1',
 			1 => '2',
 			2 => '3',
@@ -91,6 +113,20 @@ impl std::fmt::Display for Move {
 			_ => return Err(std::fmt::Error)
 		};
 
-		write!(f, "{}{}", chr, num)
+		write!(f, "{}{}{}", piece, col, row)
 	}
+}
+
+impl Into<String> for Move {
+	fn into(self) -> String {
+		format!("{}", self)
+	}
+}
+
+#[test]
+fn test_try_from_string() {
+	assert_eq!(
+		Move::try_from("Ba1"),
+		Ok(Move { color: Color::Black, x: 0, y: 0 })
+	)
 }

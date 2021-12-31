@@ -1,0 +1,9 @@
+[package]
+name = "ascacou-solver"
+description = "A (some day strong) solver for the ascacou board game"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "console"
+path = "src/console.rs"

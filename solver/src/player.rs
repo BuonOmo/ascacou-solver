@@ -11,11 +11,9 @@ pub struct Player {
 
 impl Player {
 	pub fn default_set() -> (Player, Player) {
-		let ts1 = TileSet::from([0, 1, 2, 3, 4, 5, 6, 7]);
-		let ts2 = TileSet::from([15, 14, 13, 12, 11, 10, 9, 8]);
 		(
-			Player { tiles: ts1, favorite_color: ts1.most_present_color() },
-			Player { tiles: ts2, favorite_color: ts2.most_present_color() }
+			Player::new([0, 1, 2, 3, 4, 5, 6, 7]),
+			Player::new([15, 14, 13, 12, 11, 10, 9, 8])
 		)
 	}
 
@@ -35,11 +33,15 @@ impl Player {
 			opponent_tiles[i] = tile;
 			i += 1;
 		}
-		let ts2 = TileSet::from(opponent_tiles);
-		(
-			Player { tiles: ts1, favorite_color: ts1.most_present_color() },
-			Player { tiles: ts2, favorite_color: ts2.most_present_color() }
-		)
+		(Player::new(ts1), Player::new(opponent_tiles))
+	}
+
+	fn new(tiles: impl Into<TileSet>) -> Player {
+		let ts = tiles.into();
+		Player {
+			tiles: ts,
+			favorite_color: ts.most_present_color()
+		}
 	}
 
 	pub fn has_tile(&self, tile: u8) -> bool {
@@ -49,7 +51,7 @@ impl Player {
 	pub fn fen_part(&self) -> String {
 		self.tiles
 			.into_iter()
-			.map(|tile|tile.to_string())
+			.map(|tile|format!("{:x}", tile))
 			.collect::<String>()
 	}
 
@@ -102,4 +104,10 @@ impl std::fmt::Display for Player {
 fn test_show_players() {
 	let (p1, p2) = Player::default_set();
 	println!("{}\n{}", p1, p2); /* use cargo test -- --nocapture */
+}
+
+#[test]
+fn test_fen_part() {
+	let player = Player::new([15, 14, 13, 12, 11, 10, 9, 8]);
+	assert_eq!(player.fen_part(), "89abcdef");
 }

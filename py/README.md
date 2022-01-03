@@ -15,7 +15,7 @@ while not board.is_terminal():
 	moves = board.possible_moves()
 	board = board.next(sample(moves, 1)[0])
 
-board.print()
+print(board)
 # Score is the difference between tiles made by the current player
 # and tiles made by its opponent.
 print(board.score())

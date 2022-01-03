@@ -42,6 +42,20 @@ impl Board {
     fn print(&self) {
         println!("{}", self.0);
     }
+
+    fn __str__(&self) -> String {
+        let mut str = String::new();
+        use std::fmt::Write;
+        write!(str, "{}", self.0).unwrap(); // TODO(good practice): convert to a python error
+        str
+    }
+
+    fn __repr__(&self) -> String {
+        let mut str = String::new();
+        use std::fmt::Write;
+        write!(str, "<Board fen=\"{}\" score={}>", self.0.fen(), self.0.current_score()).unwrap(); // TODO(good practice): convert to a python error
+        str
+    }
 }
 
 /// A Python module implemented in Rust.

@@ -112,7 +112,7 @@ impl Board {
 			black_mask, white_mask, current_player, opponent })
 	}
 
-	fn fen(&self) -> String {
+	pub fn fen(&self) -> String {
 		let mut idx = 0;
 		let mut str = String::new();
 		for y in 0..5 {
@@ -151,7 +151,7 @@ impl Board {
 
 				for color in [Color::Black, Color::White] {
 					let mov = Move::new(x, y, color);
-					if self.already_played(&mov, &tiles) { continue }
+					if self.already_played_or_dup_move(&mov, &tiles) { continue }
 
 					result.push(mov)
 				}
@@ -227,9 +227,16 @@ impl Board {
 
 	// TODO(perf): maybe a simpler way to implement this algorithm is to play
 	// the move and only then check for duplicates.
-	fn already_played<'a>(&self, mov: &'a Move, exhausted_tiles: &'a TileSet) -> bool {
+	/**
+	 * A dup move is a move that generates two times the same tile, hence it is invalid.
+	 */
+	fn already_played_or_dup_move<'a>(&self, mov: &'a Move, exhausted_tiles: &'a TileSet) -> bool {
+		let mut dup_list: TileSet = TileSet::empty();
 		for tile in self.tiles_from(&mov) {
 			if exhausted_tiles.has(tile) { return true }
+			if dup_list.has(tile) { return true }
+
+			dup_list.add(tile);
 		}
 		return false
 	}
@@ -444,5 +451,15 @@ mod tests {
 			1u64 << 15,
 			"position (0, 1) is incorrect"
 		)
+	}
+
+	#[test]
+	fn impossible_move_generating_two_times_the_same_tile() {
+		let board = Board::from_fen("wbbww/wbwbw/b1w1b/bbwww/wwwwb 034567ef").unwrap();
+		println!("{}", board);
+		assert_eq!(
+			board.possible_moves(),
+			vec![]
+		);
 	}
 }

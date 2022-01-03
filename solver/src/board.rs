@@ -179,6 +179,14 @@ impl Board {
 		score
 	}
 
+	pub fn is_terminal(&self) -> bool {
+		self.possible_moves().is_empty()
+	}
+
+	pub fn is_winning(&self) -> bool {
+		self.is_terminal() && self.current_score() > 0
+	}
+
 	/**
 	 * Find every filled tiles using bit computation.
 	 * If n is the number of filled tiles, this method

@@ -25,3 +25,6 @@ wasm: ## Generate wasm package under pkg/
 
 npm: wasm ## Publish to npm
 	wasm-pack publish
+
+pypi: ## Publish to pypi
+	cd py && maturin publish

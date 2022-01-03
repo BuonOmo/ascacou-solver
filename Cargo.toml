@@ -1,2 +1,2 @@
 [workspace]
-members = ["solver", "wasm"]
+members = ["py", "solver", "wasm"]

@@ -1,0 +1,13 @@
+[package]
+name = "minicou"
+description = "A (some day strong) minimax solver for the ascacou board game"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "minicou"
+path = "src/bin/cli.rs"
+
+[dependencies]
+ascacou = { path = "../engine" }
+clap = { version = "3.0.5", features = ["derive"] }

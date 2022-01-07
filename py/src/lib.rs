@@ -1,16 +1,16 @@
-use ascacou_solver;
+use ascacou_rs;
 
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 
 #[pyclass]
-struct Board(ascacou_solver::board::Board);
+struct Board(ascacou_rs::Board);
 
 #[pymethods]
 impl Board {
     #[new]
     fn new(fen: &str) -> PyResult<Self> {
-        match ascacou_solver::board::Board::from_fen(fen) {
+        match ascacou_rs::Board::from_fen(fen) {
             Ok(board) => Ok(Board(board)),
             Err(s) => Err(PyRuntimeError::new_err(s))
         }
@@ -29,7 +29,7 @@ impl Board {
     }
 
     fn next(&self, mov: String) -> PyResult<Self> {
-        match ascacou_solver::mov::Move::try_from(mov) {
+        match ascacou_rs::Move::try_from(mov) {
             Ok(mov) => Ok(Board(self.0.next(mov))),
             Err(s) => Err(PyRuntimeError::new_err(s))
         }
@@ -39,22 +39,12 @@ impl Board {
         self.0.current_score()
     }
 
-    fn print(&self) {
-        println!("{}", self.0);
-    }
-
     fn __str__(&self) -> String {
-        let mut str = String::new();
-        use std::fmt::Write;
-        write!(str, "{}", self.0).unwrap(); // TODO(good practice): convert to a python error
-        str
+        self.0.for_console()
     }
 
     fn __repr__(&self) -> String {
-        let mut str = String::new();
-        use std::fmt::Write;
-        write!(str, "<Board fen=\"{}\" score={}>", self.0.fen(), self.0.current_score()).unwrap(); // TODO(good practice): convert to a python error
-        str
+        format!("<Board fen=\"{}\" score={}>", self.0.fen(), self.0.current_score())
     }
 }
 

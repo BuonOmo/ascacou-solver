@@ -1,6 +1,5 @@
 // TODO: add moves left to complete a card to the IA.
-use crate::color::Color;
-use crate::mov::Move;
+use ascacou::{Color, Move};
 
 struct MoveScore(Move, (u8, u8));
 

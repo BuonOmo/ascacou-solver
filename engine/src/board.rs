@@ -6,20 +6,28 @@ use crate::tileset::TileSet;
 /**
  * The size of a key representing a unique position.
  */
-pub use u128 as Key;
+pub use u128 as BoardKey;
 
+// TODO: rip it off!!!!
+#[derive(Clone, Copy)]
 pub struct Board {
 	pieces_mask: u64,
 	black_mask:  u64,
-	white_mask:  u64,
 	pub current_player: Player,
-	opponent: Player
+	opponent: Player,
+	// pub possible_moves: &'a Vec<u8>
 }
 
 impl Board {
 	pub fn empty() -> Board {
 		let (current_player, opponent) = Player::default_set();
-		Board { pieces_mask: 0, black_mask: 0, white_mask: 0,
+		Board { pieces_mask: 0, black_mask: 0,
+			current_player, opponent }
+	}
+
+	pub fn random_empty() -> Board {
+		let (current_player, opponent) = Player::random_set();
+		Board { pieces_mask: 0, black_mask: 0,
 			current_player, opponent }
 	}
 
@@ -109,7 +117,7 @@ impl Board {
 		let (current_player, opponent) = Player::from_current_tiles(tiles);
 
 		Ok(Board { pieces_mask: (black_mask | white_mask),
-			black_mask, white_mask, current_player, opponent })
+			black_mask, current_player, opponent })
 	}
 
 	pub fn fen(&self) -> String {
@@ -135,14 +143,14 @@ impl Board {
 	}
 
 
-	pub fn key(&self) -> Key { // TODO(memory perf): find a way to store key in a smaller size (see patch ':/u64 key').
-		(self.pieces_mask as Key) | ((self.black_mask as Key) << 64)
+	pub fn key(&self) -> BoardKey { // TODO(memory perf): find a way to store key in a smaller size (see patch ':/u64 key').
+		(self.pieces_mask as BoardKey) | ((self.black_mask as BoardKey) << 64)
 	}
 
 	pub fn possible_moves(&self) -> Vec<Move> {
 		let mut result: Vec<Move> = Vec::with_capacity(50);
 
-		let tiles = TileSet::from(self.filled_tiles());
+		// let tiles = TileSet::from(self.filled_tiles());
 
 		for x in 0..5 {
 			for y in 0..5 {
@@ -151,14 +159,35 @@ impl Board {
 
 				for color in [Color::Black, Color::White] {
 					let mov = Move::new(x, y, color);
-					if self.already_played_or_dup_move(&mov, &tiles) { continue }
-
+					// if self.already_played_or_dup_move(&mov, &tiles) {
+					// 	continue
+					// }
+					if self.next(mov).is_invalid() { continue }
 					result.push(mov)
 				}
 			}
 		}
 
 		result
+	}
+
+	pub fn is_invalid(&self) -> bool {
+		let mut filled_tiles: [bool; 16] = [false; 16];
+		// First, we retrieve every top-left corners of filled tiles
+		let mut mask = self.pieces_mask & (self.pieces_mask >> 1);
+		mask = mask & (mask >> 7);
+		let mut prev;
+		while mask != 0 {
+			prev = mask;
+			mask &= mask - 1;
+			let top_left = prev - mask;
+			// Then we find the tile value associated
+			// for each tile.
+			let tile = self.tile_at(top_left);
+			if filled_tiles[tile as usize] { return true }
+			filled_tiles[tile as usize] = true;
+		}
+		false
 	}
 
 	// TODO: a smarter score computation could be done by taking into
@@ -180,7 +209,23 @@ impl Board {
 	}
 
 	pub fn is_terminal(&self) -> bool {
-		self.possible_moves().is_empty()
+		let tiles = &TileSet::from(self.filled_tiles());
+
+		for x in 0..5 {
+			for y in 0..5 {
+				// Already a piece there.
+				if Board::position_mask(x, y) & self.pieces_mask != 0 { continue }
+
+				for color in [Color::Black, Color::White] {
+					let mov = Move::new(x, y, color);
+					if self.already_played_or_dup_move(&mov, tiles) { continue }
+
+					return false;
+				}
+			}
+		}
+
+		true
 	}
 
 	pub fn is_winning(&self) -> bool {
@@ -218,7 +263,6 @@ impl Board {
 		let pos = Board::position_mask(mov.x, mov.y);
 		Board {
 			pieces_mask: self.pieces_mask | pos,
-			white_mask: if mov.color == Color::White { self.white_mask | pos } else { self.white_mask },
 			black_mask: if mov.color == Color::Black { self.black_mask | pos } else { self.black_mask },
 			current_player: self.opponent,
 			opponent: self.current_player
@@ -230,13 +274,13 @@ impl Board {
 	/**
 	 * A dup move is a move that generates two times the same tile, hence it is invalid.
 	 */
-	fn already_played_or_dup_move<'a>(&self, mov: &'a Move, exhausted_tiles: &'a TileSet) -> bool {
-		let mut dup_list: TileSet = TileSet::empty();
+	fn already_played_or_dup_move<'a>(&'a self, mov: &'a Move, exhausted_tiles: &'a TileSet) -> bool {
+		let mut dup_list: [bool; 16] = [false; 16];
 		for tile in self.tiles_from(&mov) {
 			if exhausted_tiles.has(tile) { return true }
-			if dup_list.has(tile) { return true }
+			if dup_list[tile as usize] { return true }
 
-			dup_list.add(tile);
+			dup_list[tile as usize] = true;
 		}
 		return false
 	}
@@ -341,23 +385,18 @@ impl Board {
 			mask << num_cols
 		}
 	}
-}
 
-impl TryFrom<&str> for Board {
-	type Error = &'static str;
-	fn try_from(s: &str) -> Result<Self, Self::Error> {
-		Board::from_fen(s)
-	}
-}
+	pub fn for_console(&self) -> String {
+		use std::fmt::Write;
 
-impl std::fmt::Display for Board {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		writeln!(f, "{}", self.fen())?;
+		let mut str = String::new();
+		str.push_str(&self.fen());
+		str.push('\n');
 
 		let filled_tiles = self.filled_tiles();
-		self.opponent.fmt_with_filled_tiles(f, &filled_tiles)?;
+		str.push_str(&self.opponent.for_console(&filled_tiles));
 
-		writeln!(f, "   a b c d e")?;
+		str.push_str("   a b c d e\n");
 		for y in 0..5 {
 			let mut line = String::new();
 
@@ -374,31 +413,25 @@ impl std::fmt::Display for Board {
 					line.push_str("\x1b[31m●");
 				}
 			}
-			writeln!(f, "{} {} {} {}", y + 1, "\x1b[47m", line, "\x1b[0m")?;
+			writeln!(&mut str, "{} {} {} {}", y + 1, "\x1b[47m", line, "\x1b[0m");
 		}
-		writeln!(f, "")?;
-		self.current_player.fmt_with_filled_tiles(f, &filled_tiles)?;
+		write!(&mut str, "\n{}", self.current_player.for_console(&filled_tiles));
 
-		Ok(())
+		str
 	}
 }
 
-// https://www.utf8icons.com/character/11044/black-large-circle
-#[test]
-fn test_show_board() {
-// 	assert_eq!(
-// 		format!("{}", Board::from_fen("1wbw/2b/1ww/5/5").unwrap()),
-// "   a b c d e
-// 1 \u{1b}[47m \u{1b}[30m· \u{1b}[31m● \u{1b}[30m● \u{1b}[31m● \u{1b}[30m· \u{1b}[0m
-// 2 \u{1b}[47m \u{1b}[30m· \u{1b}[30m· \u{1b}[30m● \u{1b}[30m· \u{1b}[30m· \u{1b}[0m
-// 3 \u{1b}[47m \u{1b}[30m· \u{1b}[31m● \u{1b}[31m● \u{1b}[30m· \u{1b}[30m· \u{1b}[0m
-// 4 \u{1b}[47m \u{1b}[30m· \u{1b}[30m· \u{1b}[30m· \u{1b}[30m· \u{1b}[30m· \u{1b}[0m
-// 5 \u{1b}[47m \u{1b}[30m· \u{1b}[30m· \u{1b}[30m· \u{1b}[30m· \u{1b}[30m· \u{1b}[0m
-// "
-// 	);
+impl TryFrom<&str> for Board {
+	type Error = &'static str;
+	fn try_from(s: &str) -> Result<Self, Self::Error> {
+		Board::from_fen(s)
+	}
+}
 
-
-	println!("{}", Board::from_fen("1wbw/2b/1ww/5/5").unwrap());
+impl std::fmt::Display for Board {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "{}", self.fen())
+	}
 }
 
 #[cfg(test)]
@@ -407,25 +440,25 @@ mod tests {
 
 	#[test]
 	fn current_score() {
-		// assert_eq!(
-		// 	Board::from_fen("1wbw/2b/1bb/5/5").unwrap().current_score(),
-		// 	0
-		// );
 		assert_eq!(
-			Board::from_fen("1wbw/2bw/1bb/5/5").unwrap().current_score(),
-			-1, // score for p2
-			"Score was not -1 for board below\n{}",
-			Board::from_fen("1wbw/2bw/1bb/5/5").unwrap()
+			Board::from_fen("1wbw/2b/1bb/5/5 01234567").unwrap().current_score(),
+			0
 		);
 		assert_eq!(
-			Board::from_fen("1wbw/2bb/1bb/5/5").unwrap().current_score(),
+			Board::from_fen("1wbw/2bw/1bb/5/5 89abcdef").unwrap().current_score(),
+			-1, // score for p2
+			"Score was not -1 for board below\n{}",
+			Board::from_fen("1wbw/2bw/1bb/5/5 89abcdef").unwrap()
+		);
+		assert_eq!(
+			Board::from_fen("1wbw/2bb/1bb/5/5 89abcdef").unwrap().current_score(),
 			1 // score for p2
 		);
 	}
 
 	#[test]
 	fn tiles_from() {
-		let mov = Move::try_from("D2").unwrap();
+		let mov = Move::try_from("wd2").unwrap();
 		let board = Board::from_fen("2wwb/2w1b/2wbb/5/5 01234567").unwrap();
 		println!("{}\nChecking tiles from move {}", board, mov);
 		assert_eq!(
@@ -456,7 +489,7 @@ mod tests {
 	#[test]
 	fn impossible_move_generating_two_times_the_same_tile() {
 		let board = Board::from_fen("wbbww/wbwbw/b1w1b/bbwww/wwwwb 034567ef").unwrap();
-		println!("{}", board);
+		println!("{}", board.for_console());
 		assert_eq!(
 			board.possible_moves(),
 			vec![]

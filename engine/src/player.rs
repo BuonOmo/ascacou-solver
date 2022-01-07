@@ -17,6 +17,16 @@ impl Player {
 		)
 	}
 
+	pub fn random_set() -> (Player, Player) {
+		use rand::seq::IteratorRandom;
+
+		let mut rng = rand::thread_rng();
+		let mut buf = [0u8; 8];
+
+		(0..16).into_iter().choose_multiple_fill(&mut rng, &mut buf);
+		Player::from_current_tiles(buf)
+	}
+
 	/**
 	 * Given a valid list of tiles (8 different tiles, unchecked there)
 	 * return two players: the first one is the current player, the
@@ -55,11 +65,14 @@ impl Player {
 			.collect::<String>()
 	}
 
-	pub fn fmt_with_filled_tiles(&self, f: &mut std::fmt::Formatter<'_>, tiles: &Vec<u8>) -> std::fmt::Result {
+	pub fn for_console(&self, tiles: &Vec<u8>) -> String {
+		use std::fmt::Write;
+
+		let mut res = String::new();
 		for tile in self.tiles {
-			write!(f, "  {: >2}  ", tile)?;
+			write!(&mut res, "  {: >2}  ", tile);
 		}
-		writeln!(f, "")?;
+		writeln!(&mut res, "");
 		for y in 0..2 {
 			let mut line = String::new();
 			let mut first_tile = true;
@@ -87,15 +100,15 @@ impl Player {
 				}
 				line.push_str(" \x1b[0m");
 			}
-			writeln!(f, "{}", line)?;
+			writeln!(&mut res, "{}", line);
 		}
-		Ok(())
+		res
 	}
 }
 
 impl std::fmt::Display for Player {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		self.fmt_with_filled_tiles(f, &Vec::new())
+		write!(f, "{}", self.fen_part())
 	}
 }
 

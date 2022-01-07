@@ -1,2 +1,6 @@
 [workspace]
-members = ["py", "solver", "wasm"]
+members = ["alphacou", "engine", "minicou", "py", "wasm"]
+
+[profile.release]
+# https://fasterthanli.me/articles/why-is-my-rust-build-so-slow
+debug = 1

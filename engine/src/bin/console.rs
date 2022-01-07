@@ -1,6 +1,5 @@
 
-use ascacou_solver::game::Game;
-use ascacou_solver::board::Board;
+use ascacou::{Board, Game};
 
 fn main() {
     for i in 0..=9 {

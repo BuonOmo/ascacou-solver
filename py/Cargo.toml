@@ -1,6 +1,6 @@
 [package]
-name = "ascacou-solver-python"
-version = "0.3.0"
+name = "ascacou-python"
+version = "0.3.1"
 edition = "2021"
 
 [lib]
@@ -8,5 +8,5 @@ name = "ascacou"
 crate-type = ["cdylib"]
 
 [dependencies]
-ascacou-solver = { path = "../solver" }
+ascacou_rs = { path = "../engine", package = "ascacou" }
 pyo3 = { version = "0.15.1", features = ["extension-module"] }

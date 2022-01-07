@@ -387,8 +387,6 @@ impl Board {
 	}
 
 	pub fn for_console(&self) -> String {
-		use std::fmt::Write;
-
 		let mut str = String::new();
 		str.push_str(&self.fen());
 		str.push('\n');
@@ -398,24 +396,26 @@ impl Board {
 
 		str.push_str("   a b c d e\n");
 		for y in 0..5 {
-			let mut line = String::new();
+			str.push_str(&(y + 1).to_string());
+			str.push_str(" \x1b[47m");
 
 			for x in 0..5 {
 				let position = Board::position_mask(x, y);
 
-				if x > 0 { line.push_str(" "); }
+				str.push_str(" ");
 
 				if self.pieces_mask & position == 0 {
-					line.push_str("\x1b[30m·");
+					str.push_str("\x1b[30m·");
 				} else if self.black_mask & position != 0 {
-					line.push_str("\x1b[30m●");
+					str.push_str("\x1b[30m●");
 				} else {
-					line.push_str("\x1b[31m●");
+					str.push_str("\x1b[31m●");
 				}
 			}
-			writeln!(&mut str, "{} {} {} {}", y + 1, "\x1b[47m", line, "\x1b[0m");
+			str.push_str(" \x1b[0m\n");
 		}
-		write!(&mut str, "\n{}", self.current_player.for_console(&filled_tiles));
+		str.push('\n');
+		str.push_str(&self.current_player.for_console(&filled_tiles));
 
 		str
 	}

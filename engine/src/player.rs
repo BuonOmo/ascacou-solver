@@ -65,44 +65,41 @@ impl Player {
 			.collect::<String>()
 	}
 
-	pub fn for_console(&self, tiles: &Vec<u8>) -> String {
-		use std::fmt::Write;
-
-		let mut res = String::new();
+	pub fn for_console(&self, filled_tiles: &Vec<u8>) -> String {
+		let mut str = String::with_capacity(209);
 		for tile in self.tiles {
-			write!(&mut res, "  {: >2}  ", tile);
-		}
-		writeln!(&mut res, "");
+			str.push_str(&format!("  {: >2}  ", tile));
+		};
+		str.push('\n');
 		for y in 0..2 {
-			let mut line = String::new();
 			let mut first_tile = true;
 
 			for tile in self.tiles {
 				if first_tile {
 					first_tile = false;
 				} else {
-					line.push_str(" ")
+					str.push(' ')
 				}
-				if tiles.into_iter().any(|t| *t == tile) {
-					line.push_str("\x1b[44m");
+				if filled_tiles.into_iter().any(|t| *t == tile) {
+					str.push_str("\x1b[44m");
 				} else {
-					line.push_str("\x1b[47m");
+					str.push_str("\x1b[47m");
 				}
 				for x in 0..2 {
 					// Tiles are counted horizontally starting at top left.
 					let position = 1 << x << 2 * y;
 
 					if tile & position != 0 {
-						line.push_str(" \x1b[30m●");
+						str.push_str(" \x1b[30m●");
 					} else {
-						line.push_str(" \x1b[31m●");
+						str.push_str(" \x1b[31m●");
 					}
 				}
-				line.push_str(" \x1b[0m");
+				str.push_str(" \x1b[0m");
 			}
-			writeln!(&mut res, "{}", line);
+			str.push('\n');
 		}
-		res
+		str
 	}
 }
 

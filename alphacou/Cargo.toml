@@ -1,0 +1,15 @@
+[package]
+name = "alphacou"
+description = "A monte-carlo tree search based AI for ascacou"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "alphacou"
+path = "src/bin/cli.rs"
+
+[dependencies]
+ascacou = { path = "../engine" }
+clap = { version = "3.0.5", features = ["derive"] }
+indextree = "4.3.1"
+rand = "0.8.4"

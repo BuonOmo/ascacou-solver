@@ -86,8 +86,11 @@ impl Solver {
 	fn select(&self, board: Board) -> (Board, NodeId) {
 		let mut board = board;
 		let mut id = self.root;
-		while !self.is_leaf(id) && self.fully_explored(id, board) {
-			id = self.best_child_uct(id);
+		while self.fully_explored(id, board) {
+			match self.best_child_uct(id) {
+				Some(node_id) => id = node_id,
+				None => break,
+			}
 			board = board.next(self.get_data(id).mov);
 		}
 
@@ -96,17 +99,16 @@ impl Solver {
 
 	fn expand(&mut self, board: Board, node_id: NodeId) -> (Board, NodeId) {
 		use rand::seq::IteratorRandom;
-
-		if board.is_terminal() {
-			return (board, node_id);
-		}
+		let mut rng = rand::thread_rng();
 
 		let already_expanded_moves: Vec<Move> = node_id.children(&self.arena).map(|id|self.get_data(id).mov).collect();
-		let mut rng = rand::thread_rng();
-		let mov = board.possible_moves().into_iter().filter(|mov|!already_expanded_moves.contains(mov)).choose(&mut rng).unwrap();
-		let new_node_id = self.arena.new_node(NodeData::new(mov));
-		node_id.append(new_node_id, &mut self.arena);
-		(board.next(mov), new_node_id)
+		if let Some(mov) = board.possible_moves().into_iter().filter(|mov|!already_expanded_moves.contains(mov)).choose(&mut rng) {
+			let new_node_id = self.arena.new_node(NodeData::new(mov));
+			node_id.append(new_node_id, &mut self.arena);
+			(board.next(mov), new_node_id)
+		} else {
+			(board, node_id)
+		}
 	}
 
 	fn simulate(board: Board) -> i32 {
@@ -116,9 +118,8 @@ impl Solver {
 		let mut current_player = 1i8;
 		let mut rng = rand::thread_rng();
 
-		while !board.is_terminal() {
+		while let Some(mov) = board.possible_moves().into_iter().choose(&mut rng)  {
 			current_player = -current_player;
-			let mov = board.possible_moves().into_iter().choose(&mut rng).unwrap();
 			board = board.next(mov);
 		}
 		(board.current_score() * current_player).clamp(-1, 1) as i32
@@ -134,8 +135,7 @@ impl Solver {
 				} else {
 					0
 				};
-			let node = self.arena.get_mut(id).unwrap();
-			let mut data = node.get_mut();
+			let mut data = self.arena.get_mut(id).map(|node|node.get_mut()).unwrap();
 			data.visits += 1;
 			data.score += value * current_player;
 			data.uct = Solver::compute_uct(&data, parent_visits);
@@ -143,14 +143,9 @@ impl Solver {
 		}
 	}
 
-	fn best_child_uct(&self, node_id: NodeId) -> NodeId {
+	fn best_child_uct(&self, node_id: NodeId) -> Option<NodeId> {
 		node_id.children(&self.arena)
 			.max_by(|a, b| self.get_data(*a).uct.cmp(&self.get_data(*b).uct))
-			.unwrap()
-	}
-
-	fn is_leaf(&self, id: NodeId) -> bool {
-		matches!(id.children(&self.arena).nth(0), None)
 	}
 
 	fn fully_explored(&self, node: NodeId, board: Board) -> bool {
@@ -162,10 +157,7 @@ impl Solver {
 	}
 
 	fn tree_depth(&self, root: NodeId) -> usize {
-		if self.is_leaf(root) {
-			return 1;
-		}
-		root.children(&self.arena).map(|nid|self.tree_depth(nid)+1).max().unwrap()
+		root.children(&self.arena).map(|nid|self.tree_depth(nid)+1).max().unwrap_or(0)
 	}
 
 	fn compute_uct(data: &NodeData, parent_visits: u32) -> i64 {

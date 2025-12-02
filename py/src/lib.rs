@@ -56,9 +56,8 @@ impl Board {
 	}
 }
 
-/// A Python module implemented in Rust.
 #[pymodule]
-fn ascacou(_py: Python, m: &PyModule) -> PyResult<()> {
-	m.add_class::<Board>()?;
-	Ok(())
+mod ascacou {
+	#[pymodule_export]
+	use super::Board;
 }

@@ -126,14 +126,20 @@ impl From<Move> for String {
 	}
 }
 
-#[test]
-fn test_try_from_string() {
-	assert_eq!(
-		Move::try_from("Ba1"),
-		Ok(Move {
-			color: Color::Black,
-			x: 0,
-			y: 0
-		})
-	)
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use std::convert::TryFrom;
+
+	#[test]
+	fn test_try_from_string() {
+		assert_eq!(
+			Move::try_from("Ba1"),
+			Ok(Move {
+				color: Color::Black,
+				x: 0,
+				y: 0
+			})
+		)
+	}
 }

@@ -116,7 +116,7 @@ impl Solver {
 
 	fn expand(&mut self, board: Board, node_id: NodeId) -> (Board, NodeId) {
 		use rand::seq::IteratorRandom;
-		let mut rng = rand::thread_rng();
+		let mut rng = rand::rng();
 
 		let already_expanded_moves: Vec<Move> = node_id
 			.children(&self.arena)
@@ -141,7 +141,7 @@ impl Solver {
 
 		let mut board = board;
 		let mut current_player = 1i8;
-		let mut rng = rand::thread_rng();
+		let mut rng = rand::rng();
 
 		while let Some(mov) = board.possible_moves().into_iter().choose(&mut rng) {
 			current_player = -current_player;
@@ -159,7 +159,7 @@ impl Solver {
 			} else {
 				0
 			};
-			let mut data = self.arena.get_mut(id).map(|node| node.get_mut()).unwrap();
+			let data = self.arena.get_mut(id).map(|node| node.get_mut()).unwrap();
 			data.visits += 1;
 			data.score += value * current_player;
 			data.uct = Solver::compute_uct(&data, parent_visits);

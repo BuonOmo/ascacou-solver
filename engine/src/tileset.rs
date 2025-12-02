@@ -10,12 +10,6 @@ pub struct TileSet {
 }
 
 impl TileSet {
-	pub fn empty() -> TileSet {
-		TileSet {
-			values: [false; 16],
-		}
-	}
-
 	pub fn has(&self, val: u8) -> bool {
 		self.values[val as usize]
 	}
@@ -36,10 +30,6 @@ impl TileSet {
 		} else {
 			Color::White
 		}
-	}
-
-	pub fn add(&mut self, val: u8) {
-		self.values[val as usize] = true;
 	}
 }
 

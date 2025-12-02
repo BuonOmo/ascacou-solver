@@ -4,7 +4,7 @@ fn main() {
 	use rand::seq::IteratorRandom;
 	use std::collections::HashMap;
 
-	let mut rng = rand::thread_rng();
+	let mut rng = rand::rng();
 	let mut map: HashMap<i8, usize> = HashMap::new();
 	let mut durations = 0;
 	for _i in 0..10_000 {

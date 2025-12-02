@@ -2,7 +2,7 @@
 name = "alphacou"
 description = "A monte-carlo tree search based AI for ascacou"
 version = "0.1.0"
-edition = "2021"
+edition.workspace = true
 
 [[bin]]
 name = "alphacou"

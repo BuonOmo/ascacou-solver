@@ -428,9 +428,9 @@ impl Board {
 				if self.pieces_mask & position == 0 {
 					str.push_str("\x1b[30m·");
 				} else if self.black_mask & position != 0 {
-					str.push_str("\x1b[30m●");
+					str.push_str(format!("{}●", Color::Black).as_str());
 				} else {
-					str.push_str("\x1b[31m●");
+					str.push_str(format!("{}●", Color::White).as_str());
 				}
 			}
 			str.push_str(" \x1b[0m\n");

@@ -44,7 +44,7 @@ impl Move {
  * Some valid moves: `wA1`, `Be5`, `bd2`.
  * Some invalid moves: `w1a`, `wf5`, `bd6`.
  */
-impl TryFrom<&str> for Move {
+impl std::convert::TryFrom<&str> for Move {
 	type Error = &'static str;
 
 	fn try_from(s: &str) -> Result<Move, Self::Error> {

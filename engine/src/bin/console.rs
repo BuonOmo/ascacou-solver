@@ -1,3 +1,5 @@
+extern crate ascacou;
+
 use ascacou::{Board, Game};
 
 fn main() {

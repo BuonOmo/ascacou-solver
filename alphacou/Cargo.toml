@@ -12,4 +12,4 @@ path = "src/bin/cli.rs"
 ascacou = { path = "../engine" }
 clap = { version = "3.0.5", features = ["derive"] }
 indextree = "4.3.1"
-rand = "0.8.4"
+rand.workspace = true

@@ -71,7 +71,7 @@ impl From<Vec<u8>> for TileSet {
 
 impl From<[u8; 8]> for TileSet {
 	fn from(tiles: [u8; 8]) -> TileSet {
-		tiles.into_iter().collect()
+		tiles.iter().map(|e| *e).collect()
 	}
 }
 
@@ -81,7 +81,7 @@ impl From<std::collections::LinkedList<u8>> for TileSet {
 	}
 }
 
-impl FromIterator<u8> for TileSet {
+impl std::iter::FromIterator<u8> for TileSet {
 	fn from_iter<I: IntoIterator<Item = u8>>(iter: I) -> TileSet {
 		let mut values = [false; 16];
 		for tile in iter {

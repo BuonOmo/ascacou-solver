@@ -2,11 +2,12 @@ use crate::color::Color;
 use crate::mov::Move;
 use crate::player::Player;
 use crate::tileset::TileSet;
+use std::iter::FromIterator;
 
 /**
  * The size of a key representing a unique position.
  */
-pub use u128 as BoardKey;
+pub use std::primitive::u128 as BoardKey;
 
 // TODO: rip it off!!!!
 #[derive(Clone, Copy)]
@@ -294,7 +295,7 @@ impl Board {
 	 * we have to call `tile_at()` for each filled tile.
 	 * Hence cost is roughly: 2 + 6 * n operations.
 	 */
-	fn filled_tiles(&self) -> impl Iterator<Item = u8> {
+	fn filled_tiles(&self) -> impl Iterator<Item = u8> + '_ {
 		// First, we retrieve every top-left corners of filled tiles
 		let mut mask = self.pieces_mask & (self.pieces_mask >> 1);
 		mask = mask & (mask >> 7);
@@ -503,7 +504,7 @@ impl Board {
 	}
 }
 
-impl TryFrom<&str> for Board {
+impl std::convert::TryFrom<&str> for Board {
 	type Error = &'static str;
 	fn try_from(s: &str) -> Result<Self, Self::Error> {
 		Board::from_fen(s)

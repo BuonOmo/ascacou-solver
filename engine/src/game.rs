@@ -1,5 +1,6 @@
 use crate::board::Board;
 use crate::mov::Move;
+use std::convert::TryFrom;
 
 pub struct Game {
 	board: Board,

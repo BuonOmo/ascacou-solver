@@ -19,7 +19,7 @@ impl Player {
 	pub fn random_set() -> (Player, Player) {
 		use rand::seq::IteratorRandom;
 
-		let mut rng = rand::thread_rng();
+		let mut rng = rand::rng();
 		let mut buf = [0u8; 8];
 
 		(0..16).into_iter().choose_multiple_fill(&mut rng, &mut buf);

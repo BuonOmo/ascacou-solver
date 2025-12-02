@@ -2,7 +2,6 @@
 name = "ascacou"
 description = "A rust game engine for Ascacou"
 version = "0.1.0"
-edition = "2024"
 
 [[bin]]
 name = "stats"
@@ -20,4 +19,4 @@ description = "allow for quick and dirty interface with bash, should change to a
 path = "src/bin/game-info.rs"
 
 [dependencies]
-rand = "0.8.4"
+rand.workspace = true

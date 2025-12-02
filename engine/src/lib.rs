@@ -1,3 +1,5 @@
+extern crate rand;
+
 pub(crate) mod board;
 pub(crate) mod color;
 pub(crate) mod game;

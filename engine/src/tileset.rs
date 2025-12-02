@@ -67,28 +67,26 @@ impl std::iter::IntoIterator for TileSet {
 // NOTE: this is a bit unsafe, we assume tiles have a value between 0..16.
 impl From<Vec<u8>> for TileSet {
 	fn from(tiles: Vec<u8>) -> TileSet {
-		let mut values = [false; 16];
-		for tile in tiles {
-			values[tile as usize] = true;
-		}
-		TileSet { values }
+		tiles.into_iter().collect()
 	}
 }
 
 impl From<[u8; 8]> for TileSet {
 	fn from(tiles: [u8; 8]) -> TileSet {
-		let mut values = [false; 16];
-		for tile in tiles {
-			values[tile as usize] = true;
-		}
-		TileSet { values }
+		tiles.into_iter().collect()
 	}
 }
 
 impl From<std::collections::LinkedList<u8>> for TileSet {
 	fn from(tiles: std::collections::LinkedList<u8>) -> TileSet {
+		tiles.into_iter().collect()
+	}
+}
+
+impl FromIterator<u8> for TileSet {
+	fn from_iter<I: IntoIterator<Item = u8>>(iter: I) -> TileSet {
 		let mut values = [false; 16];
-		for tile in tiles {
+		for tile in iter {
 			values[tile as usize] = true;
 		}
 		TileSet { values }

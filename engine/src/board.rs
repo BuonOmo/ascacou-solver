@@ -193,18 +193,10 @@ impl Board {
 
 	pub fn is_invalid(&self) -> bool {
 		let mut filled_tiles: [bool; 16] = [false; 16];
-		// First, we retrieve every top-left corners of filled tiles
-		let mut mask = self.pieces_mask & (self.pieces_mask >> 1);
-		mask = mask & (mask >> 7);
-		let mut prev;
-		while mask != 0 {
-			prev = mask;
-			mask &= mask - 1;
-			let top_left = prev - mask;
-			// Then we find the tile value associated
-			// for each tile.
-			let tile = self.tile_at(top_left);
-			if filled_tiles[tile as usize] { return true }
+		for tile in self.filled_tiles() {
+			if filled_tiles[tile as usize] {
+				return true;
+			}
 			filled_tiles[tile as usize] = true;
 		}
 		false
@@ -229,7 +221,7 @@ impl Board {
 	}
 
 	pub fn is_terminal(&self) -> bool {
-		let tiles = &TileSet::from(self.filled_tiles());
+		let tiles = &TileSet::from_iter(self.filled_tiles());
 
 		for x in 0..5 {
 			for y in 0..5 {
@@ -259,21 +251,21 @@ impl Board {
 	 * we have to call `tile_at()` for each filled tile.
 	 * Hence cost is roughly: 2 + 6 * n operations.
 	 */
-	fn filled_tiles(&self) -> Vec<u8> {
-		let mut filled_tiles: Vec<u8> = Vec::with_capacity(16);
+	fn filled_tiles(&self) -> impl Iterator<Item = u8> {
 		// First, we retrieve every top-left corners of filled tiles
 		let mut mask = self.pieces_mask & (self.pieces_mask >> 1);
 		mask = mask & (mask >> 7);
-		let mut prev;
-		while mask != 0 {
-			prev = mask;
+		std::iter::from_fn(move || {
+			if mask == 0 {
+				return None;
+			}
+			let prev = mask;
 			mask &= mask - 1;
 			let top_left = prev - mask;
 			// Then we find the tile value associated
 			// for each tile.
-			filled_tiles.push(self.tile_at(top_left));
-		}
-		filled_tiles
+			Some(self.tile_at(top_left))
+		})
 	}
 
 	/**
@@ -411,7 +403,7 @@ impl Board {
 		str.push_str(&self.fen());
 		str.push('\n');
 
-		let filled_tiles = self.filled_tiles();
+		let filled_tiles: Vec<u8> = self.filled_tiles().collect();
 		str.push_str(&self.opponent.for_console(&filled_tiles));
 
 		str.push_str("   a b c d e\n");

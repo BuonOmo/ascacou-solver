@@ -406,8 +406,13 @@ impl Board {
 		let filled_tiles: Vec<u8> = self.filled_tiles().collect();
 		str.push_str(&self.opponent.for_console(&filled_tiles));
 
+		let spacing = " ".repeat((46/* tiles len */ - 12/* board len */) / 2);
+
+		str.push('\n');
+		str.push_str(&spacing);
 		str.push_str("   a b c d e\n");
 		for y in 0..5 {
+			str.push_str(&spacing);
 			str.push_str(&(y + 1).to_string());
 			str.push_str(" \x1b[47m");
 
@@ -426,6 +431,7 @@ impl Board {
 			}
 			str.push_str(" \x1b[0m\n");
 		}
+		str.push('\n');
 		str.push('\n');
 		str.push_str(&self.current_player.for_console(&filled_tiles));
 

@@ -12,12 +12,17 @@ struct NodeData {
 	/// Sum of simulation scores.
 	score: i32,
 	// The root node has no move associated.
-	mov: Move
+	mov: Move,
 }
 
 impl NodeData {
 	fn new(mov: Move) -> NodeData {
-		NodeData { mov, visits: 0, score: 0, uct: 0 }
+		NodeData {
+			mov,
+			visits: 0,
+			score: 0,
+			uct: 0,
+		}
 	}
 }
 
@@ -44,7 +49,15 @@ impl Solver {
 		}
 		eprintln!(" max depth: {}", solver.tree_depth(solver.root));
 		eprintln!("iterations: {}", solver.iterations);
-		eprintln!("moves: {}", solver.root.children(&solver.arena).map(|id|format!("{}", solver.get_data(id).visits)).collect::<Vec<_>>().join(", "));
+		eprintln!(
+			"moves: {}",
+			solver
+				.root
+				.children(&solver.arena)
+				.map(|id| format!("{}", solver.get_data(id).visits))
+				.collect::<Vec<_>>()
+				.join(", ")
+		);
 		solver
 	}
 
@@ -52,12 +65,15 @@ impl Solver {
 		let mut arena = Arena::new();
 		let dumb_mov = Move::new(0, 0, Color::White);
 		Solver {
-			root: arena.new_node(NodeData::new(dumb_mov)), arena, iterations: 0
+			root: arena.new_node(NodeData::new(dumb_mov)),
+			arena,
+			iterations: 0,
 		}
 	}
 
 	fn current_best_move(&self) -> Option<Move> {
-		self.best_next_node(self.root).map(|node_id|self.get_data(node_id).mov)
+		self.best_next_node(self.root)
+			.map(|node_id| self.get_data(node_id).mov)
 	}
 
 	fn current_best_continuation(&self) -> Vec<Move> {
@@ -71,8 +87,9 @@ impl Solver {
 	}
 
 	fn best_next_node(&self, node_id: NodeId) -> Option<NodeId> {
-		node_id.children(&self.arena)
-			.max_by_key(|id|self.arena.get(*id).map(|node|node.get().visits))
+		node_id
+			.children(&self.arena)
+			.max_by_key(|id| self.arena.get(*id).map(|node| node.get().visits))
 	}
 
 	fn run_search_iteration(&mut self, board: Board) {
@@ -101,8 +118,16 @@ impl Solver {
 		use rand::seq::IteratorRandom;
 		let mut rng = rand::thread_rng();
 
-		let already_expanded_moves: Vec<Move> = node_id.children(&self.arena).map(|id|self.get_data(id).mov).collect();
-		if let Some(mov) = board.possible_moves().into_iter().filter(|mov|!already_expanded_moves.contains(mov)).choose(&mut rng) {
+		let already_expanded_moves: Vec<Move> = node_id
+			.children(&self.arena)
+			.map(|id| self.get_data(id).mov)
+			.collect();
+		if let Some(mov) = board
+			.possible_moves()
+			.into_iter()
+			.filter(|mov| !already_expanded_moves.contains(mov))
+			.choose(&mut rng)
+		{
 			let new_node_id = self.arena.new_node(NodeData::new(mov));
 			node_id.append(new_node_id, &mut self.arena);
 			(board.next(mov), new_node_id)
@@ -118,7 +143,7 @@ impl Solver {
 		let mut current_player = 1i8;
 		let mut rng = rand::thread_rng();
 
-		while let Some(mov) = board.possible_moves().into_iter().choose(&mut rng)  {
+		while let Some(mov) = board.possible_moves().into_iter().choose(&mut rng) {
 			current_player = -current_player;
 			board = board.next(mov);
 		}
@@ -128,14 +153,13 @@ impl Solver {
 	fn backpropagate(&mut self, node_id: NodeId, value: i32) {
 		let mut current_player = 1;
 		for id in node_id.ancestors(&mut self.arena).collect::<Vec<NodeId>>() {
-			let parent_visits =
-				if let Some(pid) = self.arena.get(id).unwrap().parent() {
-					// We add 1 there because the visit count has not been updated yet.
-					self.arena.get(pid).map(|node|node.get()).unwrap().visits + 1
-				} else {
-					0
-				};
-			let mut data = self.arena.get_mut(id).map(|node|node.get_mut()).unwrap();
+			let parent_visits = if let Some(pid) = self.arena.get(id).unwrap().parent() {
+				// We add 1 there because the visit count has not been updated yet.
+				self.arena.get(pid).map(|node| node.get()).unwrap().visits + 1
+			} else {
+				0
+			};
+			let mut data = self.arena.get_mut(id).map(|node| node.get_mut()).unwrap();
 			data.visits += 1;
 			data.score += value * current_player;
 			data.uct = Solver::compute_uct(&data, parent_visits);
@@ -144,7 +168,8 @@ impl Solver {
 	}
 
 	fn best_child_uct(&self, node_id: NodeId) -> Option<NodeId> {
-		node_id.children(&self.arena)
+		node_id
+			.children(&self.arena)
 			.max_by(|a, b| self.get_data(*a).uct.cmp(&self.get_data(*b).uct))
 	}
 
@@ -153,11 +178,14 @@ impl Solver {
 	}
 
 	fn get_data(&self, node_id: NodeId) -> &NodeData {
-		self.arena.get(node_id).map(|node|node.get()).unwrap()
+		self.arena.get(node_id).map(|node| node.get()).unwrap()
 	}
 
 	fn tree_depth(&self, root: NodeId) -> usize {
-		root.children(&self.arena).map(|nid|self.tree_depth(nid)+1).max().unwrap_or(0)
+		root.children(&self.arena)
+			.map(|nid| self.tree_depth(nid) + 1)
+			.max()
+			.unwrap_or(0)
 	}
 
 	fn compute_uct(data: &NodeData, parent_visits: u32) -> i64 {

@@ -5,15 +5,14 @@ use crate::tileset::TileSet;
 pub struct Player {
 	tiles: TileSet,
 	// Used in heuristics.
-	pub favorite_color: Color
+	pub favorite_color: Color,
 }
-
 
 impl Player {
 	pub fn default_set() -> (Player, Player) {
 		(
 			Player::new([0, 1, 2, 3, 4, 5, 6, 7]),
-			Player::new([15, 14, 13, 12, 11, 10, 9, 8])
+			Player::new([15, 14, 13, 12, 11, 10, 9, 8]),
 		)
 	}
 
@@ -38,7 +37,9 @@ impl Player {
 		let mut opponent_tiles = [0; 8];
 		let mut i = 0;
 		for tile in 0..16 {
-			if ts1.has(tile) { continue }
+			if ts1.has(tile) {
+				continue;
+			}
 
 			opponent_tiles[i] = tile;
 			i += 1;
@@ -50,7 +51,7 @@ impl Player {
 		let ts = tiles.into();
 		Player {
 			tiles: ts,
-			favorite_color: ts.most_present_color()
+			favorite_color: ts.most_present_color(),
 		}
 	}
 
@@ -61,7 +62,7 @@ impl Player {
 	pub fn fen_part(&self) -> String {
 		self.tiles
 			.into_iter()
-			.map(|tile|format!("{:x}", tile))
+			.map(|tile| format!("{:x}", tile))
 			.collect::<String>()
 	}
 
@@ -69,7 +70,7 @@ impl Player {
 		let mut str = String::with_capacity(209);
 		for tile in self.tiles {
 			str.push_str(&format!("  {: >2}  ", tile));
-		};
+		}
 		str.push('\n');
 		for y in 0..2 {
 			let mut first_tile = true;

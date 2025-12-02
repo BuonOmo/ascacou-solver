@@ -12,7 +12,7 @@ fn main() {
 		let mut board = Board::random_empty();
 		let mut current_player = 1i8;
 		while !board.is_terminal() {
-			current_player = - current_player;
+			current_player = -current_player;
 			let mov = board.possible_moves().into_iter().choose(&mut rng).unwrap();
 			board = board.next(mov);
 		}

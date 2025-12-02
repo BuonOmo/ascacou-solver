@@ -3,7 +3,7 @@ use ascacou::{Board, BoardKey};
 
 pub struct Solver {
 	explored_positions: u128,
-	transposition_table: std::collections::HashMap<BoardKey, i8>
+	transposition_table: std::collections::HashMap<BoardKey, i8>,
 }
 
 const MIN_SCORE: i8 = -100;
@@ -11,7 +11,10 @@ const MAX_SCORE: i8 = 100;
 
 impl Solver {
 	fn new() -> Solver {
-		Solver { explored_positions: 0, transposition_table: std::collections::HashMap::new() }
+		Solver {
+			explored_positions: 0,
+			transposition_table: std::collections::HashMap::new(),
+		}
 	}
 	pub fn solve(board: &Board, depth: Option<u8>) -> (i8, Option<Move>, u128) {
 		let mut solver = Solver::new();
@@ -108,11 +111,11 @@ impl Solver {
 			//  self.board.rewind_move(move)
 			//
 			//  a simple implementation of this idea only yields a quite small improvement (from 1.9ms to 1.7ms for a
-		    //  full random game simulation)
+			//  full random game simulation)
 			let score = -self.negamax(board.next(mov), -beta, -alpha, depth - 1);
 
 			if score >= beta {
-				return score
+				return score;
 			}
 
 			if score > alpha {
@@ -174,12 +177,8 @@ mod tests {
 				"Depth {} took {} seconds to explore {} positions.",
 				i, duration, explored_positions
 			);
-			assert!(
-				duration < 10.0,
-				"{}", message
-			);
+			assert!(duration < 10.0, "{}", message);
 			println!("{}", message);
 		}
-
 	}
 }

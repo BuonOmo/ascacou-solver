@@ -2,7 +2,7 @@ use crate::board::Board;
 use crate::mov::Move;
 
 pub struct Game {
-	board: Board
+	board: Board,
 }
 
 enum Action {

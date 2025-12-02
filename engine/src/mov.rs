@@ -77,22 +77,25 @@ impl TryFrom<&str> for Move {
 			None => return Err("missing information"),
 		};
 
-		Ok(Move { x: x, y: y, color: color })
+		Ok(Move {
+			x: x,
+			y: y,
+			color: color,
+		})
 	}
 }
 impl std::convert::TryFrom<String> for Move {
 	type Error = &'static str;
-    fn try_from(input: String) -> Result<Self, Self::Error> {
-        Move::try_from(input.as_ref())
-    }
+	fn try_from(input: String) -> Result<Self, Self::Error> {
+		Move::try_from(input.as_ref())
+	}
 }
 
 impl std::fmt::Display for Move {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-
 		let piece = match self.color {
 			Color::Black => 'b',
-			Color::White => 'w'
+			Color::White => 'w',
 		};
 
 		let col = match self.x {
@@ -101,7 +104,7 @@ impl std::fmt::Display for Move {
 			2 => 'c',
 			3 => 'd',
 			4 => 'e',
-			_ => return Err(std::fmt::Error)
+			_ => return Err(std::fmt::Error),
 		};
 
 		let row = match self.y {
@@ -110,16 +113,16 @@ impl std::fmt::Display for Move {
 			2 => '3',
 			3 => '4',
 			4 => '5',
-			_ => return Err(std::fmt::Error)
+			_ => return Err(std::fmt::Error),
 		};
 
 		write!(f, "{}{}{}", piece, col, row)
 	}
 }
 
-impl Into<String> for Move {
-	fn into(self) -> String {
-		format!("{}", self)
+impl From<Move> for String {
+	fn from(mov: Move) -> Self {
+		format!("{}", mov)
 	}
 }
 
@@ -127,6 +130,10 @@ impl Into<String> for Move {
 fn test_try_from_string() {
 	assert_eq!(
 		Move::try_from("Ba1"),
-		Ok(Move { color: Color::Black, x: 0, y: 0 })
+		Ok(Move {
+			color: Color::Black,
+			x: 0,
+			y: 0
+		})
 	)
 }

@@ -21,14 +21,22 @@ pub struct Board {
 impl Board {
 	pub fn empty() -> Board {
 		let (current_player, opponent) = Player::default_set();
-		Board { pieces_mask: 0, black_mask: 0,
-			current_player, opponent }
+		Board {
+			pieces_mask: 0,
+			black_mask: 0,
+			current_player,
+			opponent,
+		}
 	}
 
 	pub fn random_empty() -> Board {
 		let (current_player, opponent) = Player::random_set();
-		Board { pieces_mask: 0, black_mask: 0,
-			current_player, opponent }
+		Board {
+			pieces_mask: 0,
+			black_mask: 0,
+			current_player,
+			opponent,
+		}
 	}
 
 	/**
@@ -86,20 +94,29 @@ impl Board {
 				' ' => break,
 				'/' if y == 4 => return Err("Too much rows"),
 				'/' if x > 5 => return Err("Too much cols"),
-				'/' => { y += 1; x = 0 }
+				'/' => {
+					y += 1;
+					x = 0;
+				}
 				'1' => x += 1,
 				'2' => x += 2,
 				'3' => x += 3,
 				'4' => x += 4,
 				'5' => x += 5,
-				'b' => {black_mask |= Board::position_mask(x, y); x += 1},
-				'w' => {white_mask |= Board::position_mask(x, y); x += 1},
-				_ => return Err("invalid character")
+				'b' => {
+					black_mask |= Board::position_mask(x, y);
+					x += 1;
+				}
+				'w' => {
+					white_mask |= Board::position_mask(x, y);
+					x += 1;
+				}
+				_ => return Err("invalid character"),
 			}
 		}
 
 		if chars.peek().is_none() {
-			return Err("Incomplete FEN")
+			return Err("Incomplete FEN");
 		}
 
 		// Tiles part.
@@ -110,44 +127,62 @@ impl Board {
 			match chr.to_digit(16) {
 				// No need for a guard there, digit may not be greater than 15.
 				Some(digit) => tiles[i] = digit as u8,
-				None => return Err("invalid character")
+				None => return Err("invalid character"),
 			}
-			if i > 7 { return Err("Too much tiles") }
+			if i > 7 {
+				return Err("Too much tiles");
+			}
 			i += 1;
 		}
 
-		if i < 7 { return Err("Not enough tiles") }
+		if i < 7 {
+			return Err("Not enough tiles");
+		}
 
 		let (current_player, opponent) = Player::from_current_tiles(tiles);
 
-		Ok(Board { pieces_mask: (black_mask | white_mask),
-			black_mask, current_player, opponent })
+		Ok(Board {
+			pieces_mask: (black_mask | white_mask),
+			black_mask,
+			current_player,
+			opponent,
+		})
 	}
 
 	pub fn fen(&self) -> String {
 		let mut idx = 0;
 		let mut str = String::new();
 		for y in 0..5 {
-			if y > 0 { str.push_str("/") }
+			if y > 0 {
+				str.push_str("/")
+			}
 			for x in 0..5 {
 				if Board::position_mask(x, y) & self.pieces_mask == 0 {
 					idx += 1;
-					continue
+					continue;
 				}
 
-				if idx > 0 { str += &idx.to_string(); idx = 0 }
-				str.push_str(
-					if Board::position_mask(x, y) & self.black_mask == 0 { "w" } else { "b" }
-				)
+				if idx > 0 {
+					str += &idx.to_string();
+					idx = 0
+				}
+				str.push_str(if Board::position_mask(x, y) & self.black_mask == 0 {
+					"w"
+				} else {
+					"b"
+				})
 			}
-			if idx > 0 { str += &idx.to_string(); idx = 0 }
+			if idx > 0 {
+				str += &idx.to_string();
+				idx = 0
+			}
 		}
 
 		format!("{} {}", str, self.current_player.fen_part())
 	}
 
-
-	pub fn key(&self) -> BoardKey { // TODO(memory perf): find a way to store key in a smaller size (see patch ':/u64 key').
+	pub fn key(&self) -> BoardKey {
+		// TODO(memory perf): find a way to store key in a smaller size (see patch ':/u64 key').
 		(self.pieces_mask as BoardKey) | ((self.black_mask as BoardKey) << 64)
 	}
 
@@ -230,11 +265,15 @@ impl Board {
 		for x in 0..5 {
 			for y in 0..5 {
 				// Already a piece there.
-				if Board::position_mask(x, y) & self.pieces_mask != 0 { continue }
+				if Board::position_mask(x, y) & self.pieces_mask != 0 {
+					continue;
+				}
 
 				for color in [Color::Black, Color::White] {
 					let mov = Move::new(x, y, color);
-					if self.already_played_or_dup_move(&mov, tiles) { continue }
+					if self.already_played_or_dup_move(&mov, tiles) {
+						continue;
+					}
 
 					return false;
 				}
@@ -279,9 +318,13 @@ impl Board {
 		let pos = Board::position_mask(mov.x, mov.y);
 		Board {
 			pieces_mask: self.pieces_mask | pos,
-			black_mask: if mov.color == Color::Black { self.black_mask | pos } else { self.black_mask },
+			black_mask: if mov.color == Color::Black {
+				self.black_mask | pos
+			} else {
+				self.black_mask
+			},
 			current_player: self.opponent,
-			opponent: self.current_player
+			opponent: self.current_player,
 		}
 	}
 
@@ -290,15 +333,23 @@ impl Board {
 	/**
 	 * A dup move is a move that generates two times the same tile, hence it is invalid.
 	 */
-	fn already_played_or_dup_move<'a>(&'a self, mov: &'a Move, exhausted_tiles: &'a TileSet) -> bool {
+	fn already_played_or_dup_move<'a>(
+		&'a self,
+		mov: &'a Move,
+		exhausted_tiles: &'a TileSet,
+	) -> bool {
 		let mut dup_list: [bool; 16] = [false; 16];
 		for tile in self.tiles_from(&mov) {
-			if exhausted_tiles.has(tile) { return true }
-			if dup_list[tile as usize] { return true }
+			if exhausted_tiles.has(tile) {
+				return true;
+			}
+			if dup_list[tile as usize] {
+				return true;
+			}
 
 			dup_list[tile as usize] = true;
 		}
-		return false
+		return false;
 	}
 
 	/**
@@ -322,7 +373,6 @@ impl Board {
 					}
 					tiles.push(tile);
 				}
-
 			}
 		}
 
@@ -335,10 +385,18 @@ impl Board {
 	 */
 	const fn tile_at(&self, top_left: u64) -> u8 {
 		let mut tile = 0u8;
-		if top_left & self.black_mask != 0 { tile |= 1 }
-		if (top_left << 1) & self.black_mask != 0 { tile |= 2 }
-		if (top_left << 7) & self.black_mask != 0 { tile |= 4 }
-		if (top_left << 8) & self.black_mask != 0 { tile |= 8 }
+		if top_left & self.black_mask != 0 {
+			tile |= 1
+		}
+		if (top_left << 1) & self.black_mask != 0 {
+			tile |= 2
+		}
+		if (top_left << 7) & self.black_mask != 0 {
+			tile |= 4
+		}
+		if (top_left << 8) & self.black_mask != 0 {
+			tile |= 8
+		}
 		tile
 	}
 
@@ -375,9 +433,7 @@ impl Board {
 	fn shift_rows(mask: u64, num_rows: i8) -> u64 {
 		#[cfg(debug_assertions)]
 		{
-			assert!(
-				-5 < num_rows && num_rows < 5
-			)
+			assert!(-5 < num_rows && num_rows < 5)
 		}
 		// See position_mask for the 7x7 board size explanation.
 		if num_rows < 0 {
@@ -390,9 +446,7 @@ impl Board {
 	fn shift_cols(mask: u64, num_cols: i8) -> u64 {
 		#[cfg(debug_assertions)]
 		{
-			assert!(
-				-5 < num_cols && num_cols < 5
-			)
+			assert!(-5 < num_cols && num_cols < 5)
 		}
 		// See position_mask for the 7x7 board size explanation.
 		if num_cols < 0 {
@@ -426,7 +480,13 @@ impl Board {
 				str.push_str(" ");
 
 				if self.pieces_mask & position == 0 {
-					str.push_str("\x1b[30m·");
+					if self.next(Move::black(x, y)).is_invalid()
+						&& self.next(Move::white(x, y)).is_invalid()
+					{
+						str.push_str("\x1b[30mx");
+					} else {
+						str.push_str("\x1b[30m·");
+					}
 				} else if self.black_mask & position != 0 {
 					str.push_str(format!("{}●", Color::Black).as_str());
 				} else {
@@ -463,17 +523,23 @@ mod tests {
 	#[test]
 	fn current_score() {
 		assert_eq!(
-			Board::from_fen("1wbw/2b/1bb/5/5 01234567").unwrap().current_score(),
+			Board::from_fen("1wbw/2b/1bb/5/5 01234567")
+				.unwrap()
+				.current_score(),
 			0
 		);
 		assert_eq!(
-			Board::from_fen("1wbw/2bw/1bb/5/5 89abcdef").unwrap().current_score(),
+			Board::from_fen("1wbw/2bw/1bb/5/5 89abcdef")
+				.unwrap()
+				.current_score(),
 			-1, // score for p2
 			"Score was not -1 for board below\n{}",
 			Board::from_fen("1wbw/2bw/1bb/5/5 89abcdef").unwrap()
 		);
 		assert_eq!(
-			Board::from_fen("1wbw/2bb/1bb/5/5 89abcdef").unwrap().current_score(),
+			Board::from_fen("1wbw/2bb/1bb/5/5 89abcdef")
+				.unwrap()
+				.current_score(),
 			1 // score for p2
 		);
 	}
@@ -483,10 +549,7 @@ mod tests {
 		let mov = Move::try_from("wd2").unwrap();
 		let board = Board::from_fen("2wwb/2w1b/2wbb/5/5 01234567").unwrap();
 		println!("{}\nChecking tiles from move {}", board, mov);
-		assert_eq!(
-			board.tiles_from(&mov),
-			vec![0, 10, 8, 14]
-		)
+		assert_eq!(board.tiles_from(&mov), vec![0, 10, 8, 14])
 	}
 
 	#[test]
@@ -512,9 +575,6 @@ mod tests {
 	fn impossible_move_generating_two_times_the_same_tile() {
 		let board = Board::from_fen("wbbww/wbwbw/b1w1b/bbwww/wwwwb 034567ef").unwrap();
 		println!("{}", board.for_console());
-		assert_eq!(
-			board.possible_moves(),
-			vec![]
-		);
+		assert_eq!(board.possible_moves(), vec![]);
 	}
 }

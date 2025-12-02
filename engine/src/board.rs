@@ -35,12 +35,14 @@ impl Board {
 	 * Any Ascacou position may quite simply be described by a PGN
 	 * like notation. For instance:
 	 *
-	 *       a  b  c  d  e
-	 *     1    W  B  W
-	 *     2       B
-	 *     3    W  W
-	 *     4
-	 *     5
+	 * ```text
+	 *   a  b  c  d  e
+	 * 1    W  B  W
+	 * 2       B
+	 * 3    W  W
+	 * 4
+	 * 5
+	 * ```
 	 *
 	 * Could be refered to as `c2 B3 B1 C3 c1 D1`. This strings
 	 * gives us the information of move order, and the case tells
@@ -63,8 +65,10 @@ impl Board {
 	 * representation. These black pieces will represent bits that are
 	 * on in our number, in the order indicated below.
 	 *
-	 *     1 2
-	 *     3 4
+	 * ```text
+	 * 1 2
+	 * 3 4
+	 * ```
 	 */
 	pub fn from_fen(fen: &str) -> Result<Board, &'static str> {
 		let mut black_mask = 0u64;

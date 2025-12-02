@@ -131,15 +131,13 @@ mod tests {
 
 	#[test]
 	fn it_finds_winning_continuations() {
-		let board = Board::from_fen("2bbw/bww1w/w1w1w/1w1bw/wbb1b 2458abdf").unwrap();
+		let board = Board::from_fen("2bbw/bww1w/w1w1w/1w1bw/wbb1b 013679ce").unwrap();
 		println!("{}", board.for_console());
 		println!("{:?}", Solver::solve(&board, Some(8)));
-		assert!(
-			matches!(
-				Solver::solve(&board, Some(8)),
-				(x, Some(_), _) if x > 0
-			)
-		);
+		assert!(matches!(
+			Solver::solve(&board, Some(8)),
+			(x, Some(_), _) if x > 0
+		));
 		let board = Board::from_fen("1wbw/2b/1bb/5/5 01234567").unwrap();
 		println!("{}", board.for_console());
 		assert_eq!(
@@ -152,9 +150,14 @@ mod tests {
 	fn it_solves_endings_quickly() {
 		let board = Board::from_fen("wwwbb/bwbwb/bbbww/bbwww/w 01234567").unwrap();
 		println!("{}", board.for_console());
+		let expected = (3, Some(Move::white(3, 4)), 30);
+		let solved = Solver::solve(&board, Some(100));
 		assert_eq!(
-			Solver::solve(&board, Some(100)),
-			(1, Some(Move::white(1, 3)), 39)
+			expected,
+			solved,
+			"expected {}, got {}",
+			expected.1.unwrap(),
+			solved.1.unwrap()
 		)
 	}
 

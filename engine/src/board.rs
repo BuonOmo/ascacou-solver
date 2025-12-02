@@ -12,7 +12,7 @@ pub use u128 as BoardKey;
 #[derive(Clone, Copy)]
 pub struct Board {
 	pieces_mask: u64,
-	black_mask:  u64,
+	black_mask: u64,
 	pub current_player: Player,
 	opponent: Player,
 	// pub possible_moves: &'a Vec<u8>
@@ -150,25 +150,45 @@ impl Board {
 	pub fn possible_moves(&self) -> Vec<Move> {
 		let mut result: Vec<Move> = Vec::with_capacity(50);
 
-		// let tiles = TileSet::from(self.filled_tiles());
+		for color in [
+			self.current_player.favorite_color,
+			!self.current_player.favorite_color,
+		] {
+			// First, the center, most likely to change the score.
+			for x in 1..4 {
+				for y in 1..4 {
+					self.add_move(x, y, color, &mut result);
+				}
+			}
 
-		for x in 0..5 {
-			for y in 0..5 {
-				// Already a piece there.
-				if Board::position_mask(x, y) & self.pieces_mask != 0 { continue }
+			// Then the edges.
+			for i in 1..4 {
+				for j in [0, 4] {
+					self.add_move(i, j, color, &mut result);
+					self.add_move(j, i, color, &mut result);
+				}
+			}
 
-				for color in [Color::Black, Color::White] {
-					let mov = Move::new(x, y, color);
-					// if self.already_played_or_dup_move(&mov, &tiles) {
-					// 	continue
-					// }
-					if self.next(mov).is_invalid() { continue }
-					result.push(mov)
+			// Finally the corners.
+			for x in [0, 4] {
+				for y in [0, 4] {
+					self.add_move(x, y, color, &mut result);
 				}
 			}
 		}
 
 		result
+	}
+
+	fn add_move(&self, x: i8, y: i8, color: Color, vec: &mut Vec<Move>) {
+		if Board::position_mask(x, y) & self.pieces_mask != 0 {
+			return;
+		}
+		let mov = Move::new(x, y, color);
+		if self.next(mov).is_invalid() {
+			return;
+		}
+		vec.push(mov);
 	}
 
 	pub fn is_invalid(&self) -> bool {
@@ -190,7 +210,7 @@ impl Board {
 		false
 	}
 
-	// TODO: a smarter score computation could be done by taking into
+	// TODO: a smarter score computation could be done by taking into
 	// account each player's score, and give a greater edge to a position
 	// close to terminal. More interesting even is the idea of taking into
 	// account partially filled tiles.

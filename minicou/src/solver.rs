@@ -1,6 +1,5 @@
-use ascacou::{Board, BoardKey};
-use crate::heuristic;
 use ascacou::Move;
+use ascacou::{Board, BoardKey};
 
 pub struct Solver {
 	explored_positions: u128,
@@ -18,7 +17,6 @@ impl Solver {
 		let mut solver = Solver::new();
 
 		let (score, mov) = solver.negamax0(board, MIN_SCORE, MAX_SCORE, depth.unwrap_or(5));
-		// let (score, mov) = solver.n0(board, depth.unwrap_or(5));
 
 		(score, mov, solver.explored_positions)
 	}
@@ -38,60 +36,34 @@ impl Solver {
 	// 	move_scores
 	// }
 
-	fn n0(&mut self, board: &Board, depth: u8) -> (i8, Option<Move>) {
-		self.explored_positions += 1;
-
-		if depth == 0 {
-			panic!("that makes no sense");
-		}
-
-		let possible_moves = board.possible_moves();
-
-		if possible_moves.is_empty() {
-			return (board.current_score(), None);
-		}
-
-		let mut best_mov: Option<Move> = None;
-		let mut best_score = MIN_SCORE;
-
-		for mov in possible_moves {
-			let score = -self.negamax(board.next(mov), MIN_SCORE, MAX_SCORE, depth - 1);
-			if score > best_score {
-				best_mov = Some(mov);
-				best_score = score;
-			}
-		}
-
-		return (best_score, best_mov)
-	}
-
-	fn negamax0(&mut self, board: &Board, mut alpha: i8, beta: i8, depth: u8) -> (i8, Option<Move>) {
+	fn negamax0(
+		&mut self,
+		board: &Board,
+		mut alpha: i8,
+		beta: i8,
+		depth: u8,
+	) -> (i8, Option<Move>) {
 		self.explored_positions += 1;
 
 		// let current_score = board.current_score();
 
 		if depth == 0 {
-			return (board.current_score(), None)
+			return (board.current_score(), None);
 		}
 
-		let possible_moves = board.possible_moves();
+		let moves = board.possible_moves();
 
-		if possible_moves.is_empty() {
+		if moves.is_empty() {
 			return (board.current_score(), None);
 		}
 
 		let mut best_mov: Option<Move> = None;
 
-		let moves = heuristic::sorted_moves(
-			possible_moves,
-			board.current_player.favorite_color
-		);
-
 		for mov in moves {
 			let score = -self.negamax(board.next(mov), -beta, -alpha, depth - 1);
 			// println!("{:?} - {}", mov, score);
 			if score >= beta {
-				return (score, Some(mov))
+				return (score, Some(mov));
 			}
 
 			if score > alpha {
@@ -115,19 +87,15 @@ impl Solver {
 		}
 
 		if depth == 0 {
-			return board.current_score()
-		}
-
-		let possible_moves = board.possible_moves();
-
-		if possible_moves.is_empty() { /* terminal position */
 			return board.current_score();
 		}
 
-		let moves = heuristic::sorted_moves(
-			possible_moves,
-			board.current_player.favorite_color
-		);
+		let moves = board.possible_moves();
+
+		if moves.is_empty() {
+			/* terminal position */
+			return board.current_score();
+		}
 
 		for mov in moves {
 			// TODO(perf): we could have the board being part of the solver as mutable, and

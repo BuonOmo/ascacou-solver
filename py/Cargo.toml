@@ -8,5 +8,5 @@ name = "ascacou"
 crate-type = ["cdylib"]
 
 [dependencies]
-ascacou_rs = { path = "../engine", package = "ascacou" }
+ascacou.workspace = true
 pyo3 = { version = "0.27", features = ["extension-module"] }

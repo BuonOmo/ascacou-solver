@@ -14,8 +14,8 @@ crate-type = ["cdylib", "rlib"]
 default = ["console_error_panic_hook"]
 
 [dependencies]
-ascacou = { path = "../engine" }
-minicou = { path = "../minicou" }
+ascacou.workspace = true
+minicou.workspace = true
 wasm-bindgen = "0.2.106"
 getrandom = { version = "0.3", features = ["wasm_js"] }
 

@@ -6,7 +6,11 @@ members = ["alphacou", "engine", "minicou", "py", "wasm"]
 edition = "2024"
 
 [workspace.dependencies]
+ascacou = { path = "engine" }
+minicou = { path = "minicou" }
 rand = "0.9"
+clap = { version = "3.0.5", features = ["derive"] }
+indextree = "4.3.1"
 
 [profile.release]
 # https://fasterthanli.me/articles/why-is-my-rust-build-so-slow

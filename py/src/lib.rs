@@ -1,4 +1,4 @@
-use ascacou_rs;
+use ::ascacou as ascacou_rs;
 
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;

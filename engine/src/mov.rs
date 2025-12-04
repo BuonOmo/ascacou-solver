@@ -11,15 +11,15 @@ pub struct Move {
 }
 
 impl Move {
-	pub fn new(x: i8, y: i8, color: Color) -> Move {
+	pub const fn new(x: i8, y: i8, color: Color) -> Move {
 		Move { x, y, color }
 	}
 
-	pub fn black(x: i8, y: i8) -> Move {
+	pub const fn black(x: i8, y: i8) -> Move {
 		Move::new(x, y, Color::Black)
 	}
 
-	pub fn white(x: i8, y: i8) -> Move {
+	pub const fn white(x: i8, y: i8) -> Move {
 		Move::new(x, y, Color::White)
 	}
 

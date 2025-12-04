@@ -190,29 +190,13 @@ impl Board {
 	pub fn possible_moves(&self) -> Vec<Move> {
 		let mut result: Vec<Move> = Vec::with_capacity(50);
 
-		for color in [
-			self.current_player.favorite_color,
-			!self.current_player.favorite_color,
-		] {
-			// First, the center, most likely to change the score.
-			for x in 1..4 {
-				for y in 1..4 {
-					self.add_move(x, y, color, &mut result);
-				}
-			}
-
-			// Then the edges.
-			for i in 1..4 {
-				for j in [0, 4] {
-					self.add_move(i, j, color, &mut result);
-					self.add_move(j, i, color, &mut result);
-				}
-			}
-
-			// Finally the corners.
-			for x in [0, 4] {
-				for y in [0, 4] {
-					self.add_move(x, y, color, &mut result);
+		for color in [Color::Black, Color::White] {
+			for x in 0..5 {
+				for y in 0..5 {
+					let mov = Move::new(x, y, color);
+					if self.is_move_possible(&mov) {
+						result.push(mov);
+					}
 				}
 			}
 		}
@@ -220,15 +204,14 @@ impl Board {
 		result
 	}
 
-	fn add_move(&self, x: i8, y: i8, color: Color, vec: &mut Vec<Move>) {
-		if Board::position_mask(x, y) & self.pieces_mask != 0 {
-			return;
+	pub fn is_move_possible(&self, mov: &Move) -> bool {
+		if Board::position_mask(mov.x, mov.y) & self.pieces_mask != 0 {
+			return false;
 		}
-		let mov = Move::new(x, y, color);
 		if self.next(mov).is_invalid() {
-			return;
+			return false;
 		}
-		vec.push(mov);
+		true
 	}
 
 	pub fn is_invalid(&self) -> bool {
@@ -315,7 +298,7 @@ impl Board {
 	/**
 	 * Apply a move without checking for its validity.
 	 */
-	pub fn next(&self, mov: Move) -> Board {
+	pub fn next(&self, mov: &Move) -> Board {
 		let pos = Board::position_mask(mov.x, mov.y);
 		Board {
 			pieces_mask: self.pieces_mask | pos,
@@ -481,8 +464,8 @@ impl Board {
 				str.push_str(" ");
 
 				if self.pieces_mask & position == 0 {
-					if self.next(Move::black(x, y)).is_invalid()
-						&& self.next(Move::white(x, y)).is_invalid()
+					if self.next(&Move::black(x, y)).is_invalid()
+						&& self.next(&Move::white(x, y)).is_invalid()
 					{
 						str.push_str("\x1b[30mx");
 					} else {

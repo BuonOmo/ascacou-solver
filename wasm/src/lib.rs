@@ -27,7 +27,7 @@ pub fn solve(fen: &str, depth: u8) -> Result<String, String> {
 pub fn play(fen: &str, #[wasm_bindgen(js_name = "move")] mov: &str) -> Result<String, String> {
 	let board = Board::from_fen(fen)?;
 	let mov = Move::try_from(mov.to_string())?;
-	let next = board.next(mov);
+	let next = board.next(&mov);
 	if next.is_invalid() {
 		return Err("Invalid move".to_string());
 	}

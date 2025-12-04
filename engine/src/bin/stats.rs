@@ -14,7 +14,7 @@ fn main() {
 		while !board.is_terminal() {
 			current_player = -current_player;
 			let mov = board.possible_moves().into_iter().choose(&mut rng).unwrap();
-			board = board.next(mov);
+			board = board.next(&mov);
 		}
 		let score = board.current_score();
 		durations += now.elapsed().as_nanos();

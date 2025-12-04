@@ -9,6 +9,43 @@ pub struct Solver {
 const MIN_SCORE: i8 = -100;
 const MAX_SCORE: i8 = 100;
 
+macro_rules! heuristic_moves {
+	( $first_color:ident => $last_color:ident [ $( ($x:expr, $y:expr) )* ] ) => {
+		[
+			$(
+				Move::$first_color($x, $y),
+			)*
+			$(
+				Move::$last_color($x, $y),
+			)*
+		]
+	};
+}
+
+const HEURISTIC_BLACK_FIRST: [Move; 50] = heuristic_moves!(black => white [
+	// First, center
+	(2, 2) (2, 1) (1, 2) (2, 3) (3, 2)
+	(1, 1) (1, 3) (3, 1) (3, 3)
+	// Then edges
+	(0, 2) (4, 2) (2, 0) (2, 4)
+	(0, 1) (4, 1) (1, 0) (1, 4)
+	(0, 3) (4, 3) (3, 0) (3, 4)
+	// Then corners
+	(0, 0) (0, 4) (4, 0) (4, 4)
+]);
+
+const HEURISTIC_WHITE_FIRST: [Move; 50] = heuristic_moves!(white => black [
+	// First, center
+	(2, 2) (2, 1) (1, 2) (2, 3) (3, 2)
+	(1, 1) (1, 3) (3, 1) (3, 3)
+	// Then edges
+	(0, 2) (4, 2) (2, 0) (2, 4)
+	(0, 1) (4, 1) (1, 0) (1, 4)
+	(0, 3) (4, 3) (3, 0) (3, 4)
+	// Then corners
+	(0, 0) (0, 4) (4, 0) (4, 4)
+]);
+
 impl Solver {
 	fn new() -> Solver {
 		Solver {
@@ -21,23 +58,8 @@ impl Solver {
 
 		let (score, mov) = solver.negamax0(board, MIN_SCORE, MAX_SCORE, depth.unwrap_or(5));
 
-		(score, mov, solver.explored_positions)
+		(score, mov.cloned(), solver.explored_positions)
 	}
-
-	// pub fn move_scores(board: &Board, depth: Option<u8>) -> Vec<(&Move, i8)> {
-	// 	let mut solver = Solver::new();
-
-	// 	let mut move_scores = Vec::with_capacity(50);
-
-	// 	for mov in board.possible_moves() {
-	// 		move_scores.push(
-	// 			(mov, -solver.negamax(board.next(mov), MIN_SCORE, MAX_SCORE, depth.unwrap_or(5)))
-	// 		);
-	// 	}
-
-	// 	move_scores.sort_by_key(|(_mov, score)| -score);
-	// 	move_scores
-	// }
 
 	fn negamax0(
 		&mut self,
@@ -45,26 +67,20 @@ impl Solver {
 		mut alpha: i8,
 		beta: i8,
 		depth: u8,
-	) -> (i8, Option<Move>) {
+	) -> (i8, Option<&Move>) {
 		self.explored_positions += 1;
-
-		// let current_score = board.current_score();
 
 		if depth == 0 {
 			return (board.current_score(), None);
 		}
 
-		let moves = board.possible_moves();
+		let moves = Solver::possible_moves(&board);
 
-		if moves.is_empty() {
-			return (board.current_score(), None);
-		}
-
-		let mut best_mov: Option<Move> = None;
-
+		let mut best_mov: Option<&Move> = None;
+		let mut terminal = true;
 		for mov in moves {
-			let score = -self.negamax(board.next(mov), -beta, -alpha, depth - 1);
-			// println!("{:?} - {}", mov, score);
+			terminal = false;
+			let score = -self.negamax(board.next(&mov), -beta, -alpha, depth - 1);
 			if score >= beta {
 				return (score, Some(mov));
 			}
@@ -73,6 +89,9 @@ impl Solver {
 				alpha = score;
 				best_mov = Some(mov);
 			}
+		}
+		if terminal {
+			alpha = board.current_score();
 		}
 
 		return (alpha, best_mov);
@@ -93,14 +112,12 @@ impl Solver {
 			return board.current_score();
 		}
 
-		let moves = board.possible_moves();
+		let moves = Solver::possible_moves(&board);
 
-		if moves.is_empty() {
-			/* terminal position */
-			return board.current_score();
-		}
+		let mut terminal = true;
 
 		for mov in moves {
+			terminal = false;
 			// TODO(perf): we could have the board being part of the solver as mutable, and
 			//  have a function to make a move and unmake a move. This way we would not
 			//  instanciate any new board, may be much more performant.
@@ -112,7 +129,7 @@ impl Solver {
 			//
 			//  a simple implementation of this idea only yields a quite small improvement (from 1.9ms to 1.7ms for a
 			//  full random game simulation)
-			let score = -self.negamax(board.next(mov), -beta, -alpha, depth - 1);
+			let score = -self.negamax(board.next(&mov), -beta, -alpha, depth - 1);
 
 			if score >= beta {
 				return score;
@@ -123,8 +140,24 @@ impl Solver {
 			}
 		}
 
+		if terminal {
+			return board.current_score();
+		}
+
 		self.transposition_table.insert(key, alpha);
 		return alpha;
+	}
+
+	pub fn possible_moves<'a>(board: &Board) -> impl Iterator<Item = &'a Move> {
+		let black_fav = board.current_player.favorite_color == ascacou::Color::Black;
+		let preferred_heuristic = if black_fav {
+			&HEURISTIC_BLACK_FIRST
+		} else {
+			&HEURISTIC_WHITE_FIRST
+		};
+		preferred_heuristic
+			.iter()
+			.filter(|mov| board.is_move_possible(mov))
 	}
 }
 
@@ -159,8 +192,8 @@ mod tests {
 			expected,
 			solved,
 			"expected {}, got {}",
-			expected.1.unwrap(),
-			solved.1.unwrap()
+			expected.1.as_ref().unwrap(),
+			solved.1.as_ref().unwrap()
 		)
 	}
 
@@ -174,8 +207,11 @@ mod tests {
 			let (.., explored_positions) = Solver::solve(&board, Some(i));
 			let duration = now.elapsed().as_secs_f32();
 			let message = format!(
-				"Depth {} took {} seconds to explore {} positions.",
-				i, duration, explored_positions
+				"Depth {} took {:.3} seconds to explore {:e} positions. ({:.2}M positions/sec)",
+				i,
+				duration,
+				explored_positions,
+				(explored_positions as f32) / (duration * 1_000_000.0)
 			);
 			assert!(duration < 10.0, "{}", message);
 			println!("{}", message);

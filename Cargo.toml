@@ -12,6 +12,11 @@ rand = "0.9"
 clap = { version = "3.0.5", features = ["derive"] }
 indextree = "4.3.1"
 
+[profile.dev]
+# Needed for better instrument output
+split-debuginfo = "packed"
+
 [profile.release]
 # https://fasterthanli.me/articles/why-is-my-rust-build-so-slow
 debug = 1
+split-debuginfo = "packed"

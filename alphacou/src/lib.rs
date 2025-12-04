@@ -108,7 +108,7 @@ impl Solver {
 				Some(node_id) => id = node_id,
 				None => break,
 			}
-			board = board.next(self.get_data(id).mov);
+			board = board.next(&self.get_data(id).mov);
 		}
 
 		(board, id)
@@ -130,7 +130,7 @@ impl Solver {
 		{
 			let new_node_id = self.arena.new_node(NodeData::new(mov));
 			node_id.append(new_node_id, &mut self.arena);
-			(board.next(mov), new_node_id)
+			(board.next(&mov), new_node_id)
 		} else {
 			(board, node_id)
 		}
@@ -145,7 +145,7 @@ impl Solver {
 
 		while let Some(mov) = board.possible_moves().into_iter().choose(&mut rng) {
 			current_player = -current_player;
-			board = board.next(mov);
+			board = board.next(&mov);
 		}
 		(board.current_score() * current_player).clamp(-1, 1) as i32
 	}

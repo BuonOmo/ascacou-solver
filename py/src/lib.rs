@@ -34,7 +34,7 @@ impl Board {
 
 	fn next(&self, mov: String) -> PyResult<Self> {
 		match ascacou_rs::Move::try_from(mov) {
-			Ok(mov) => Ok(Board(self.0.next(mov))),
+			Ok(mov) => Ok(Board(self.0.next(&mov))),
 			Err(s) => Err(PyRuntimeError::new_err(s)),
 		}
 	}

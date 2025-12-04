@@ -367,21 +367,15 @@ impl Board {
 	 * Return the tile number at a given position. This method
 	 * assumes that the tile is full of pieces.
 	 */
-	const fn tile_at(&self, top_left: u64) -> u8 {
-		let mut tile = 0u8;
-		if top_left & self.black_mask != 0 {
-			tile |= 1
-		}
-		if (top_left << 1) & self.black_mask != 0 {
-			tile |= 2
-		}
-		if (top_left << 7) & self.black_mask != 0 {
-			tile |= 4
-		}
-		if (top_left << 8) & self.black_mask != 0 {
-			tile |= 8
-		}
-		tile
+	fn tile_at(&self, top_left: u64) -> u8 {
+		let top_left_shift = top_left.trailing_zeros();
+
+		let a = (self.black_mask & top_left) >> top_left_shift;
+		let b = (self.black_mask & (top_left << 1)) >> top_left_shift;
+		let c = (self.black_mask & (top_left << 7)) >> (top_left_shift + 5);
+		let d = (self.black_mask & (top_left << 8)) >> (top_left_shift + 5);
+
+		(a | b | c | d) as u8
 	}
 
 	fn position_mask(x: i8, y: i8) -> u64 {
@@ -503,6 +497,35 @@ impl std::fmt::Display for Board {
 #[cfg(test)]
 mod tests {
 	use super::*;
+
+	macro_rules! assert_tile {
+		($board:expr, ($x:expr, $y:expr), $tile:expr) => {
+			let result = $board.tile_at(Board::position_mask($x, $y));
+			assert_eq!(
+				result, $tile,
+				"\nExpected: {:0>4b},\n     got: {:0>4b}",
+				$tile, result
+			);
+		};
+	}
+
+	#[test]
+	fn tile_at() {
+		let mut board = Board::from_fen("bw/ww/5/5/5 01234567").unwrap();
+		assert_tile!(board, (0, 0), 0b0001);
+		board = Board::from_fen("bb/ww/5/5/5 01234567").unwrap();
+		assert_tile!(board, (0, 0), 0b0011);
+		board = Board::from_fen("bb/bw/5/5/5 01234567").unwrap();
+		assert_tile!(board, (0, 0), 0b0111);
+		board = Board::from_fen("bb/bb/5/5/5 01234567").unwrap();
+		assert_tile!(board, (0, 0), 0b1111);
+		board = Board::from_fen("wwbb/wwbbb/wb/5/5 01234567").unwrap();
+		assert_tile!(board, (0, 0), 0b0000);
+		assert_tile!(board, (1, 0), 0b1010);
+		assert_tile!(board, (2, 0), 0b1111);
+		assert_tile!(board, (2, 0), 0b1111);
+		assert_tile!(board, (0, 1), 0b1000);
+	}
 
 	#[test]
 	fn current_score() {

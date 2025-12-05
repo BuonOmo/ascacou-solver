@@ -2,9 +2,9 @@ use ascacou::Board;
 use rand::prelude::*;
 use std::io::Write;
 
-pub(crate) mod util;
+pub(crate) mod utils;
 
-use crate::util::{FILES, MAX_GROUP_SIZE, MOVES_LEFT};
+use crate::utils::{FILES, MAX_GROUP_SIZE, MOVES_LEFT};
 
 fn generate_file<P>(filename: P, lines: usize, moves_left: usize) -> Result<(), &'static str>
 where

@@ -1,9 +1,9 @@
-pub(crate) mod util;
+pub(crate) mod utils;
 
-use std::borrow::Borrow;
+use std::io::Write;
 use std::time::{Duration, Instant};
 
-use crate::util::{FILES, MAX_DEPTHS};
+use crate::utils::{FILES, MAX_DEPTHS};
 
 type SimpleResult<T> = Result<T, &'static str>;
 type EmptyResult = SimpleResult<()>;
@@ -59,7 +59,7 @@ fn find_depth(fen: &str, max_depth: u8, is_partial: bool) -> SimpleResult<u8> {
 	let mut max = 1;
 	for i in 2..=max_depth {
 		let (duration, _) = run_one(fen, i, is_partial)?;
-		if duration.as_secs_f64() > 1.0 {
+		if duration.as_secs_f64() > 2.0 {
 			break;
 		} else {
 			max = i;
@@ -102,16 +102,15 @@ fn set_dir() -> EmptyResult {
 }
 
 fn iterations() -> impl Iterator<Item = (bool, &'static str, u8)> + 'static {
-	let length = FILES.len() * 2;
-	[true, false]
-		.iter()
-		.cycle()
-		.take(length)
+	let length = FILES.len();
+	std::iter::repeat_n(true, length)
+		.chain(std::iter::repeat_n(false, length))
 		.zip(std::iter::zip(FILES.iter(), MAX_DEPTHS.iter()).cycle())
-		.map(|(&partial, (&file, &depth))| (partial, file, depth))
+		.map(|(partial, (&file, &depth))| (partial, file, depth))
 }
 
-fn print_table(headers: [String; 5], body: Vec<[String; 5]>) {
+fn generate_table(headers: [String; 5], body: Vec<[String; 5]>) -> Vec<u8> {
+	let mut buffer = Vec::new();
 	let lengths: [usize; 5] = [headers.clone()]
 		.iter()
 		.chain(body.iter())
@@ -137,8 +136,43 @@ fn print_table(headers: [String; 5], body: Vec<[String; 5]>) {
 		.chain(body.iter())
 		.zip([lengths].iter().cycle())
 		.for_each(|([a, b, c, d, e], [len_a, len_b, len_c, len_d, len_e])| {
-			println!("| {a:len_a$} | {b:len_b$} | {c:len_c$} | {d:len_d$} | {e:len_e$} |");
+			writeln!(
+				&mut buffer,
+				"| {a:len_a$} | {b:len_b$} | {c:len_c$} | {d:len_d$} | {e:len_e$} |"
+			)
+			.ok();
 		});
+	buffer
+}
+
+fn write_to_readme(table: Vec<u8>) -> EmptyResult {
+	let magic_string = "<!-- AUTOMAGICALLY ADDED, SEE BENCHMARKS CRATE -->\n";
+	let readme = std::path::Path::new("../../README.md");
+	if !readme.exists() {
+		return Err("Could not locate README.md");
+	}
+	let content =
+		std::fs::read_to_string(readme).map_err(|_| "Could not read content of README.md")?;
+
+	let indices = content.match_indices(magic_string);
+	match indices.collect::<Vec<(usize, &str)>>().as_slice() {
+		[(start, _), (end, _)] => {
+			let mut new_content = String::new();
+			new_content.push_str(&content[..start + magic_string.len()]);
+			new_content.push_str(&String::from_utf8_lossy(&table));
+			new_content.push_str(&content[*end..]);
+
+			let mut file = std::fs::File::create(readme)
+				.map_err(|_| "Could not open README.md for writing")?;
+			file.write_all(new_content.as_bytes())
+				.map_err(|_| "Could not write updated content to README.md")?;
+		}
+		_ => {
+			return Err("Could not find magic string twice in README.md");
+		}
+	}
+
+	Ok(())
 }
 
 fn main() -> EmptyResult {
@@ -166,7 +200,9 @@ fn main() -> EmptyResult {
 		)
 		.collect();
 
-	print_table(headers, body);
+	let table = generate_table(headers, body);
+
+	write_to_readme(table)?;
 
 	Ok(())
 }

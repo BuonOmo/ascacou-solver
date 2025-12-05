@@ -67,7 +67,7 @@ impl Solver {
 			return (board.current_score(), None);
 		}
 
-		let moves = Solver::possible_moves(&board);
+		let moves = possible_moves(&board);
 
 		let mut best_mov: Option<&Move> = None;
 		let mut terminal = true;

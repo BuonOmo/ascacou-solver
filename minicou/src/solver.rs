@@ -157,7 +157,15 @@ impl Solver {
 pub fn solve(board: &Board, depth: Option<u8>) -> (i8, Option<Move>, u128) {
 	let mut solver = Solver::new();
 
-	let (score, mov) = solver.negamax0(board, MIN_SCORE, MAX_SCORE, depth.unwrap_or(5));
+	let (score, mov) = solver.negamax0(board, MIN_SCORE, MAX_SCORE, depth.unwrap_or(51));
+
+	(score, mov.cloned(), solver.explored_positions)
+}
+
+pub fn partial_solve(board: &Board, depth: Option<u8>) -> (i8, Option<Move>, u128) {
+	let mut solver = Solver::new();
+
+	let (score, mov) = solver.negamax0(board, -1, 1, depth.unwrap_or(51));
 
 	(score, mov.cloned(), solver.explored_positions)
 }
@@ -203,6 +211,27 @@ mod tests {
 			let board = Board::from_fen("1wbw/2b/1bb/5/5 01234567").unwrap();
 			let now = std::time::Instant::now();
 			let (.., explored_positions) = solve(&board, Some(i));
+			let duration = now.elapsed().as_secs_f32();
+			let message = format!(
+				"Depth {} took {:.3} seconds to explore {} positions. ({:.2}M positions/sec)",
+				i,
+				duration,
+				explored_positions,
+				(explored_positions as f32) / (duration * 1_000_000.0)
+			);
+			assert!(duration < 10.0, "{}", message);
+			println!("{}", message);
+		}
+	}
+
+	#[test]
+	#[ignore = "too slow, shall be used as a benchmark."]
+	fn depths_partial() {
+		for i in 1..25 {
+			// let board = Board::from_fen("5/5/5/5/5").unwrap();
+			let board = Board::from_fen("1wbw/2b/1bb/5/5 01234567").unwrap();
+			let now = std::time::Instant::now();
+			let (.., explored_positions) = partial_solve(&board, Some(i));
 			let duration = now.elapsed().as_secs_f32();
 			let message = format!(
 				"Depth {} took {:.3} seconds to explore {} positions. ({:.2}M positions/sec)",

@@ -1,36 +1,22 @@
 pub(crate) mod util;
 
 use std::time::{Duration, Instant};
-use std::{sync::mpsc, thread};
 
-use crate::util::FILES;
+use crate::util::{FILES, MAX_DEPTHS};
 
-fn run_one<S>(fen: impl AsRef<str>, solver: S) -> Result<(Duration, u128), &'static str>
-where
-	S: Fn(&ascacou::Board) -> u128 + Send + 'static,
-{
+fn run_one(fen: impl AsRef<str>, depth: u8) -> Result<(Duration, u128), &'static str> {
 	let board = ascacou::Board::from_fen(fen.as_ref()).map_err(|_| "Could not parse FEN")?;
-	let (sender, receiver) = mpsc::channel();
-	let runner = thread::spawn(move || {
-		let start = Instant::now();
-		let positions = solver(&board);
-		sender.send((start.elapsed(), positions)).ok();
-	});
-	thread::sleep(Duration::from_secs(5));
-	let (duration, positions) = receiver.try_recv().map_err(|_| "No result in time")?;
-	runner.join().map_err(|_| "runner panicked")?;
-
+	let time = Instant::now();
+	let (_, _, positions) = minicou::solve(&board, Some(depth));
+	let duration = time.elapsed();
 	Ok((duration, positions))
 }
 
-fn run_group<S>(
+fn run_group(
 	file: impl AsRef<str>,
-	solver: S,
+	max_depth: u8,
 	max_iter: usize,
-) -> Result<(Duration, u128), &'static str>
-where
-	S: Fn(&ascacou::Board) -> u128 + Send + 'static + Copy,
-{
+) -> Result<(u8, Duration, u128), &'static str> {
 	let content =
 		std::fs::read_to_string(file.as_ref()).map_err(|_| "Could not read benchmark file")?;
 	let mut total_duration = Duration::ZERO;
@@ -38,28 +24,46 @@ where
 	let lines: Vec<&str> = content.lines().collect();
 	let count = lines.len();
 	let count = if count > max_iter { max_iter } else { count };
+	let depth = find_depth(lines[0], max_depth)?;
 	let mut i = 0;
 	for line in lines {
 		i += 1;
 		if i > count {
 			break;
 		}
-		let (duration, positions) = run_one(line, solver)?;
+		let (duration, positions) = run_one(line, depth)?;
 		total_duration += duration;
 		total_positions += positions;
 	}
 	let avg_duration = total_duration / count as u32;
 	let avg_positions = total_positions / count as u128;
 
-	Ok((avg_duration, avg_positions))
+	Ok((depth, avg_duration, avg_positions))
 }
 
-fn full(board: &ascacou::Board) -> u128 {
-	minicou::solve(board, Some(51)).2
+fn find_depth(fen: &str, max_depth: u8) -> Result<u8, &'static str> {
+	let mut max = 1;
+	for i in 2..=max_depth {
+		let (duration, _) = run_one(fen, i)?;
+		if duration.as_secs_f64() > 1.0 {
+			break;
+		} else {
+			max = i;
+		}
+	}
+	Ok(max)
 }
 
-fn shallow(board: &ascacou::Board) -> u128 {
-	minicou::solve(board, Some(8)).2
+fn pos_per_ms(positions: u128, duration: Duration) -> String {
+	let freq = positions as f64 / duration.as_secs_f64();
+	let (freq, unit) = if freq > 999_999.0 {
+		(freq / 1_000_000.0, "M")
+	} else if freq > 999.0 {
+		(freq / 1_000.0, "K")
+	} else {
+		(freq, "")
+	};
+	format!("{:.2}{}", freq, unit)
 }
 
 fn main() -> Result<(), &'static str> {
@@ -69,27 +73,25 @@ fn main() -> Result<(), &'static str> {
 	}
 	std::env::set_current_dir(dir).map_err(|_| "Could not change directory")?;
 
-	let shallow: fn(&ascacou::Board) -> u128 = shallow;
-	let full: fn(&ascacou::Board) -> u128 = full;
-	let solvers = [("full", full), ("shallow", shallow)];
-
-	println!("test\tavg time\tavg pos\tpos/ms");
-	for file in FILES {
-		for (name, solver) in solvers {
-			match run_group(file, solver, 2) {
-				Ok((avg_duration, avg_positions)) => {
-					println!(
-						"{}-{}\t{:.2?}\t{}\t{}",
-						file,
-						name,
-						avg_duration,
-						avg_positions,
-						avg_positions as f64 / avg_duration.as_secs_f64() / 1000.0
-					);
-				}
-				Err(_) => {
-					println!("{}-{}\tn/a\tn/a\tn/a", file, name)
-				}
+	println!("sample\tdepth\tavg time\tavg pos\tpos/ms");
+	for (&file, &max_depth) in std::iter::zip(FILES, MAX_DEPTHS) {
+		match run_group(file, max_depth, 10) {
+			Ok((depth, avg_duration, avg_positions)) => {
+				println!(
+					"{}\t{}\t{:.2?}\t{}\t{}",
+					file,
+					if depth < max_depth {
+						depth.to_string()
+					} else {
+						"max".to_string()
+					},
+					avg_duration,
+					avg_positions,
+					pos_per_ms(avg_positions, avg_duration)
+				);
+			}
+			Err(_) => {
+				println!("{}\t0\tn/a\tn/a\tn/a", file)
 			}
 		}
 	}

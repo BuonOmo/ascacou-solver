@@ -4,7 +4,7 @@ use std::io::Write;
 
 pub(crate) mod util;
 
-use crate::util::{FILES, MOVES_LEFT};
+use crate::util::{FILES, MAX_GROUP_SIZE, MOVES_LEFT};
 
 fn generate_file<P>(filename: P, lines: usize, moves_left: usize) -> Result<(), &'static str>
 where
@@ -45,7 +45,7 @@ fn main() -> Result<(), &'static str> {
 	}
 	std::env::set_current_dir(dir).map_err(|_| "Could not change directory")?;
 	for (&file, &moves_left) in std::iter::zip(FILES, MOVES_LEFT) {
-		generate_file(file, 100, moves_left)?;
+		generate_file(file, MAX_GROUP_SIZE, moves_left)?;
 	}
 	Ok(())
 }

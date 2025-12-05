@@ -1,3 +1,4 @@
-pub const FILES: &[&str] = &["startgame", "earlygame", "midgame", "endgame"];
-pub const MOVES_LEFT: &[usize] = &[49, 40, 25, 10];
-pub const MAX_DEPTHS: &[usize] = &[50, 41, 26, 11];
+pub const FILES: &[&str] = &["endgame", "midgame", "earlygame", "startgame"];
+pub const MOVES_LEFT: &[usize] = &[10, 30, 40, 49];
+pub const MAX_DEPTHS: &[u8] = &[11, 31, 41, 50];
+pub const MAX_GROUP_SIZE: usize = 100;

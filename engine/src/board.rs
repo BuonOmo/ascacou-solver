@@ -151,12 +151,12 @@ impl Board {
 	}
 
 	pub fn fen(&self) -> String {
-		let mut idx = 0;
 		let mut str = String::new();
 		for y in 0..5 {
 			if y > 0 {
 				str.push_str("/")
 			}
+			let mut idx = 0;
 			for x in 0..5 {
 				if Board::position_mask(x, y) & self.pieces_mask == 0 {
 					idx += 1;
@@ -164,7 +164,11 @@ impl Board {
 				}
 
 				if idx > 0 {
-					str += &idx.to_string();
+					if x + idx < 5 {
+						// We only add it if not at the end
+						// of the row.
+						str += &idx.to_string();
+					}
 					idx = 0
 				}
 				str.push_str(if Board::position_mask(x, y) & self.black_mask == 0 {
@@ -172,10 +176,6 @@ impl Board {
 				} else {
 					"b"
 				})
-			}
-			if idx > 0 {
-				str += &idx.to_string();
-				idx = 0
 			}
 		}
 

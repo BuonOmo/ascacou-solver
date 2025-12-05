@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["alphacou", "engine", "minicou", "py", "wasm"]
+members = ["alphacou", "engine", "minicou", "py", "wasm", "benchmarks"]
 
 [workspace.package]
 edition = "2024"

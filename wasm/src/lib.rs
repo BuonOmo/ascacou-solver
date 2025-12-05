@@ -1,5 +1,4 @@
 use ascacou::{Board, Move};
-use minicou::Solver;
 
 mod utils;
 
@@ -15,7 +14,7 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 pub fn solve(fen: &str, depth: u8) -> Result<String, String> {
 	let board = Board::from_fen(fen)?;
 
-	let (_, mov_opt, _) = Solver::solve(&board, Some(depth));
+	let (_, mov_opt, _) = minicou::solve(&board, Some(depth));
 
 	let Some(mov) = mov_opt else {
 		return Err("No solution found".to_string());

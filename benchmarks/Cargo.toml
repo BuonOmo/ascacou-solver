@@ -1,0 +1,17 @@
+[package]
+name = "benchmarks"
+version = "0.1.0"
+edition.workspace = true
+
+[[bin]]
+name = "generate"
+path = "generate.rs"
+
+[[bin]]
+name = "run"
+path = "run.rs"
+
+[dependencies]
+ascacou.workspace = true
+minicou.workspace = true
+rand.workspace = true

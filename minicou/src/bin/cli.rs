@@ -1,6 +1,5 @@
 use ascacou::Board;
 use clap::Parser;
-use minicou::Solver;
 use std::time::Instant;
 
 #[derive(Parser)]
@@ -17,7 +16,7 @@ struct Args {
 fn main() {
 	let args = Args::parse();
 	let t0 = Instant::now();
-	if let (score, Some(mov), explored_positions) = Solver::solve(&args.board, Some(args.depth)) {
+	if let (score, Some(mov), explored_positions) = minicou::solve(&args.board, Some(args.depth)) {
 		println!("Move: {}", mov);
 		println!("Time: {:.2?}", Instant::now() - t0);
 		println!("Score: {}", score);

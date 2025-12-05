@@ -53,13 +53,6 @@ impl Solver {
 			transposition_table: std::collections::HashMap::new(),
 		}
 	}
-	pub fn solve(board: &Board, depth: Option<u8>) -> (i8, Option<Move>, u128) {
-		let mut solver = Solver::new();
-
-		let (score, mov) = solver.negamax0(board, MIN_SCORE, MAX_SCORE, depth.unwrap_or(5));
-
-		(score, mov.cloned(), solver.explored_positions)
-	}
 
 	fn negamax0(
 		&mut self,
@@ -161,6 +154,14 @@ impl Solver {
 	}
 }
 
+pub fn solve(board: &Board, depth: Option<u8>) -> (i8, Option<Move>, u128) {
+	let mut solver = Solver::new();
+
+	let (score, mov) = solver.negamax0(board, MIN_SCORE, MAX_SCORE, depth.unwrap_or(5));
+
+	(score, mov.cloned(), solver.explored_positions)
+}
+
 #[cfg(test)]
 mod tests {
 	use super::*;
@@ -169,25 +170,22 @@ mod tests {
 	fn it_finds_winning_continuations() {
 		let board = Board::from_fen("2bbw/bww1w/w1w1w/1w1bw/wbb1b 013679ce").unwrap();
 		println!("{}", board.for_console());
-		println!("{:?}", Solver::solve(&board, Some(8)));
+		println!("{:?}", solve(&board, Some(8)));
 		assert!(matches!(
-			Solver::solve(&board, Some(8)),
+			solve(&board, Some(8)),
 			(x, Some(_), _) if x > 0
 		));
 		let board = Board::from_fen("1wbw/2b/1bb/5/5 01234567").unwrap();
 		println!("{}", board.for_console());
-		assert_eq!(
-			Solver::solve(&board, Some(1)),
-			(1, Some(Move::white(3, 1)), 39)
-		)
+		assert_eq!(solve(&board, Some(1)), (1, Some(Move::white(3, 1)), 39))
 	}
 
 	#[test]
 	fn it_solves_endings_quickly() {
 		let board = Board::from_fen("wwwbb/bwbwb/bbbww/bbwww/w 01234567").unwrap();
 		println!("{}", board.for_console());
-		let expected = (3, Some(Move::white(3, 4)), 30);
-		let solved = Solver::solve(&board, Some(100));
+		let expected = (3, Some(Move::white(3, 4)), 23);
+		let solved = solve(&board, Some(100));
 		assert_eq!(
 			expected,
 			solved,
@@ -204,10 +202,10 @@ mod tests {
 			// let board = Board::from_fen("5/5/5/5/5").unwrap();
 			let board = Board::from_fen("1wbw/2b/1bb/5/5 01234567").unwrap();
 			let now = std::time::Instant::now();
-			let (.., explored_positions) = Solver::solve(&board, Some(i));
+			let (.., explored_positions) = solve(&board, Some(i));
 			let duration = now.elapsed().as_secs_f32();
 			let message = format!(
-				"Depth {} took {:.3} seconds to explore {:e} positions. ({:.2}M positions/sec)",
+				"Depth {} took {:.3} seconds to explore {} positions. ({:.2}M positions/sec)",
 				i,
 				duration,
 				explored_positions,

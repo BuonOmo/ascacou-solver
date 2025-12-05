@@ -7,7 +7,12 @@ edition.workspace = true
 [[bin]]
 name = "minicou"
 path = "src/bin/cli.rs"
+required-features = ["cli"]
+
 
 [dependencies]
 ascacou.workspace = true
-clap.workspace = true
+clap = { workspace = true, optional = true }
+
+[features]
+cli = ["clap"]

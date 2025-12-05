@@ -12,8 +12,8 @@ pub use std::primitive::u128 as BoardKey;
 // TODO: rip it off!!!!
 #[derive(Clone, Copy)]
 pub struct Board {
-	pieces_mask: u64,
-	black_mask: u64,
+	pub pieces_mask: u64,
+	pub black_mask: u64,
 	pub current_player: Player,
 	opponent: Player,
 	// pub possible_moves: &'a Vec<u8>
@@ -409,10 +409,7 @@ impl Board {
 	}
 
 	fn shift_rows(mask: u64, num_rows: i8) -> u64 {
-		#[cfg(debug_assertions)]
-		{
-			assert!(-5 < num_rows && num_rows < 5)
-		}
+		debug_assert!(-5 < num_rows && num_rows < 5);
 		// See position_mask for the 7x7 board size explanation.
 		if num_rows < 0 {
 			mask >> -7 * num_rows
@@ -422,10 +419,7 @@ impl Board {
 	}
 
 	fn shift_cols(mask: u64, num_cols: i8) -> u64 {
-		#[cfg(debug_assertions)]
-		{
-			assert!(-5 < num_cols && num_cols < 5)
-		}
+		debug_assert!(-5 < num_cols && num_cols < 5);
 		// See position_mask for the 7x7 board size explanation.
 		if num_cols < 0 {
 			mask >> -num_cols

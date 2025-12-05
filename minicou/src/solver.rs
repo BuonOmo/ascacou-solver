@@ -67,7 +67,7 @@ impl Solver {
 			return (board.current_score(), None);
 		}
 
-		let moves = possible_moves(&board);
+		let moves = Self::possible_moves(&board);
 
 		let mut best_mov: Option<&Move> = None;
 		let mut terminal = true;
@@ -75,12 +75,12 @@ impl Solver {
 			terminal = false;
 			let score = -self.negamax(board.next(&mov), -beta, -alpha, depth - 1);
 			if score >= beta {
-				return (score, Some(mov));
+				return (score, Some(&mov));
 			}
 
 			if score > alpha {
 				alpha = score;
-				best_mov = Some(mov);
+				best_mov = Some(&mov);
 			}
 		}
 		if terminal {
@@ -93,7 +93,8 @@ impl Solver {
 	fn negamax(&mut self, board: Board, mut alpha: i8, mut beta: i8, depth: u8) -> i8 {
 		self.explored_positions += 1;
 
-		let key = board.key();
+		let key = key(&board);
+
 		// Reduce window by finding a transposition with a lower beta.
 		if let Some(cached_beta) = self.transposition_table.get(&key) {
 			if beta > *cached_beta {
@@ -105,7 +106,7 @@ impl Solver {
 			return board.current_score();
 		}
 
-		let moves = Solver::possible_moves(&board);
+		let moves = possible_moves(&board);
 
 		let mut terminal = true;
 
@@ -140,18 +141,22 @@ impl Solver {
 		self.transposition_table.insert(key, alpha);
 		return alpha;
 	}
+}
 
-	pub fn possible_moves<'a>(board: &Board) -> impl Iterator<Item = &'a Move> {
-		let black_fav = board.current_player.favorite_color == ascacou::Color::Black;
-		let preferred_heuristic = if black_fav {
-			&HEURISTIC_BLACK_FIRST
-		} else {
-			&HEURISTIC_WHITE_FIRST
-		};
-		preferred_heuristic
-			.iter()
-			.filter(|mov| board.is_move_possible(mov))
-	}
+fn possible_moves<'a>(board: &Board) -> impl Iterator<Item = &'a Move> {
+	let black_fav = board.current_player.favorite_color == ascacou::Color::Black;
+	let preferred_heuristic = if black_fav {
+		&HEURISTIC_BLACK_FIRST
+	} else {
+		&HEURISTIC_WHITE_FIRST
+	};
+	preferred_heuristic
+		.iter()
+		.filter(|mov| board.is_move_possible(mov))
+}
+
+fn key(board: &Board) -> u128 {
+	(board.pieces_mask as u128) | ((board.black_mask as u128) << 64)
 }
 
 pub fn solve(board: &Board, depth: Option<u8>) -> (i8, Option<Move>, u128) {

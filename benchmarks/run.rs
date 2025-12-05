@@ -59,7 +59,7 @@ fn find_depth(fen: &str, max_depth: u8, is_partial: bool) -> SimpleResult<u8> {
 	let mut max = 1;
 	for i in 2..=max_depth {
 		let (duration, _) = run_one(fen, i, is_partial)?;
-		if duration.as_secs_f64() > 2.0 {
+		if duration.as_secs_f64() > 5.0 {
 			break;
 		} else {
 			max = i;
@@ -109,7 +109,20 @@ fn iterations() -> impl Iterator<Item = (bool, &'static str, u8)> + 'static {
 		.map(|(partial, (&file, &depth))| (partial, file, depth))
 }
 
-fn generate_table(headers: [String; 5], body: Vec<[String; 5]>) -> Vec<u8> {
+enum Alignment {
+	#[allow(dead_code)]
+	Left,
+	#[allow(dead_code)]
+	Center,
+	Right,
+	Default,
+}
+
+fn generate_table(
+	alignments: [Alignment; 5],
+	headers: [String; 5],
+	body: Vec<[String; 5]>,
+) -> Vec<u8> {
 	let mut buffer = Vec::new();
 	let lengths: [usize; 5] = [headers.clone()]
 		.iter()
@@ -127,20 +140,35 @@ fn generate_table(headers: [String; 5], body: Vec<[String; 5]>) -> Vec<u8> {
 				]
 			},
 		);
-
-	let underlines = lengths.map(|l| format!("{:-<l$}", ""));
+	// format!("{:-<l$}", "")
+	let underlines: Vec<String> = lengths
+		.iter()
+		.zip(&alignments)
+		.map(|(l, a)| match a {
+			Alignment::Left => format!(":{:-<width$}", "-", width = l - 1),
+			Alignment::Center => format!(":{:-<width$}:", "-", width = l - 2),
+			Alignment::Right => format!("{:-<width$}:", "-", width = l - 1),
+			Alignment::Default => format!("{:-<width$}", "-", width = l),
+		})
+		.collect();
 
 	[headers]
 		.iter()
-		.chain([underlines].iter())
+		.chain([underlines.try_into().unwrap()].iter())
 		.chain(body.iter())
 		.zip([lengths].iter().cycle())
-		.for_each(|([a, b, c, d, e], [len_a, len_b, len_c, len_d, len_e])| {
-			writeln!(
-				&mut buffer,
-				"| {a:len_a$} | {b:len_b$} | {c:len_c$} | {d:len_d$} | {e:len_e$} |"
-			)
-			.ok();
+		.zip([&alignments].iter().cycle())
+		.for_each(|((cells, lens), alignments)| {
+			for i in 0..5 {
+				let (cell, len) = (&cells[i], lens[i]);
+				match alignments[i] {
+					Alignment::Left => write!(&mut buffer, "| {cell:<len$} ").ok(),
+					Alignment::Center => write!(&mut buffer, "| {cell:^len$} ").ok(),
+					Alignment::Right => write!(&mut buffer, "| {cell:>len$} ").ok(),
+					Alignment::Default => write!(&mut buffer, "| {cell:len$} ").ok(),
+				};
+			}
+			write!(&mut buffer, "|\n").ok();
 		});
 	buffer
 }
@@ -178,6 +206,13 @@ fn write_to_readme(table: Vec<u8>) -> EmptyResult {
 fn main() -> EmptyResult {
 	set_dir()?;
 
+	let alignments = [
+		Alignment::Default,
+		Alignment::Default,
+		Alignment::Right,
+		Alignment::Right,
+		Alignment::Right,
+	];
 	let headers = ["sample", "depth", "avg time", "avg n pos", "pos/ms"].map(String::from);
 	let body: Vec<[String; 5]> = iterations()
 		.map(
@@ -200,7 +235,7 @@ fn main() -> EmptyResult {
 		)
 		.collect();
 
-	let table = generate_table(headers, body);
+	let table = generate_table(alignments, headers, body);
 
 	write_to_readme(table)?;
 

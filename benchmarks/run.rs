@@ -69,7 +69,7 @@ fn find_depth(fen: &str, max_depth: u8, is_partial: bool) -> SimpleResult<u8> {
 }
 
 fn format_pos_per_ms(positions: u128, duration: Duration) -> String {
-	let freq = positions as f64 / duration.as_secs_f64();
+	let freq = positions as f64 / duration.as_secs_f64() / 1_000.0;
 	let (freq, unit) = if freq > 999_999.0 {
 		(freq / 1_000_000.0, "M")
 	} else if freq > 999.0 {
@@ -81,15 +81,12 @@ fn format_pos_per_ms(positions: u128, duration: Duration) -> String {
 }
 
 fn format_depth(depth: u8, max_depth: u8, is_partial: bool) -> String {
-	let mut depth = if depth < max_depth {
-		depth.to_string()
-	} else {
-		"max".to_string()
-	};
-	if is_partial {
-		depth.push_str(" (partial)");
-	}
-	depth
+	format!(
+		"{}/{}{}",
+		depth,
+		max_depth,
+		if is_partial { " (partial)" } else { "" }
+	)
 }
 
 fn set_dir() -> EmptyResult {

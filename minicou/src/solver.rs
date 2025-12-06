@@ -64,16 +64,16 @@ impl Solver {
 		self.explored_positions += 1;
 
 		if depth == 0 {
-			return (board.current_score(), None);
+			return (score(board), None);
 		}
 
-		let moves = Self::possible_moves(&board);
+		let moves = possible_moves(&board);
 
 		let mut best_mov: Option<&Move> = None;
 		let mut terminal = true;
 		for mov in moves {
 			terminal = false;
-			let score = -self.negamax(board.next(&mov), -beta, -alpha, depth - 1);
+			let score = -self.negamax(&board.next(&mov), -beta, -alpha, depth - 1);
 			if score >= beta {
 				return (score, Some(&mov));
 			}
@@ -84,13 +84,13 @@ impl Solver {
 			}
 		}
 		if terminal {
-			alpha = board.current_score();
+			alpha = score(board);
 		}
 
 		return (alpha, best_mov);
 	}
 
-	fn negamax(&mut self, board: Board, mut alpha: i8, mut beta: i8, depth: u8) -> i8 {
+	fn negamax(&mut self, board: &Board, mut alpha: i8, mut beta: i8, depth: u8) -> i8 {
 		self.explored_positions += 1;
 
 		let key = key(&board);
@@ -103,7 +103,7 @@ impl Solver {
 		}
 
 		if depth == 0 {
-			return board.current_score();
+			return score(board);
 		}
 
 		let moves = possible_moves(&board);
@@ -123,7 +123,7 @@ impl Solver {
 			//
 			//  a simple implementation of this idea only yields a quite small improvement (from 1.9ms to 1.7ms for a
 			//  full random game simulation)
-			let score = -self.negamax(board.next(&mov), -beta, -alpha, depth - 1);
+			let score = -self.negamax(&board.next(&mov), -beta, -alpha, depth - 1);
 
 			if score >= beta {
 				return score;
@@ -135,7 +135,7 @@ impl Solver {
 		}
 
 		if terminal {
-			return board.current_score();
+			alpha = score(&board);
 		}
 
 		self.transposition_table.insert(key, alpha);
@@ -157,6 +157,10 @@ fn possible_moves<'a>(board: &Board) -> impl Iterator<Item = &'a Move> {
 
 fn key(board: &Board) -> u128 {
 	(board.pieces_mask as u128) | ((board.black_mask as u128) << 64)
+}
+
+fn score(board: &Board) -> i8 {
+	board.current_score()
 }
 
 pub fn solve(board: &Board, depth: Option<u8>) -> (i8, Option<Move>, u128) {

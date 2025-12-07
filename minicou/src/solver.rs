@@ -155,10 +155,20 @@ fn possible_moves<'a>(board: &Board) -> impl Iterator<Item = &'a Move> {
 		.filter(|mov| board.is_move_possible(mov))
 }
 
+// TODO(perf): Design a u64 key, and try partial key matching.
+// See https://www.chessprogramming.org/Transposition_Table
 fn key(board: &Board) -> u128 {
 	(board.pieces_mask as u128) | ((board.black_mask as u128) << 64)
 }
 
+// TODO: a smarter score computation could be done by taking into
+// account each player's score, and give a greater edge to a position
+// close to terminal. More interesting even is the idea of taking into
+// account partially filled tiles, e.g. forcing moves where only
+// one color can be played to fill a tile.
+//
+// A _close to terminal_ position would be a position with few
+// available moves.
 fn score(board: &Board) -> i8 {
 	board.current_score()
 }

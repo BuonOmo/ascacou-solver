@@ -4,11 +4,6 @@ use crate::player::Player;
 use crate::tileset::TileSet;
 use std::iter::FromIterator;
 
-/**
- * The size of a key representing a unique position.
- */
-pub use std::primitive::u128 as BoardKey;
-
 // TODO: rip it off!!!!
 #[derive(Clone, Copy)]
 pub struct Board {
@@ -182,26 +177,17 @@ impl Board {
 		format!("{} {}", str, self.current_player.fen_part())
 	}
 
-	pub fn key(&self) -> BoardKey {
-		// TODO(memory perf): find a way to store key in a smaller size (see patch ':/u64 key').
-		(self.pieces_mask as BoardKey) | ((self.black_mask as BoardKey) << 64)
-	}
-
-	pub fn possible_moves(&self) -> Vec<Move> {
-		let mut result: Vec<Move> = Vec::with_capacity(50);
-
+	pub gen fn possible_moves(&self) -> Move {
 		for color in [Color::Black, Color::White] {
 			for x in 0..5 {
 				for y in 0..5 {
 					let mov = Move::new(x, y, color);
 					if self.is_move_possible(&mov) {
-						result.push(mov);
+						yield mov;
 					}
 				}
 			}
 		}
-
-		result
 	}
 
 	pub fn is_move_possible(&self, mov: &Move) -> bool {
@@ -278,21 +264,18 @@ impl Board {
 	 * we have to call `tile_at()` for each filled tile.
 	 * Hence cost is roughly: 2 + 6 * n operations.
 	 */
-	fn filled_tiles(&self) -> impl Iterator<Item = u8> + '_ {
+	gen fn filled_tiles(&self) -> u8 {
 		// First, we retrieve every top-left corners of filled tiles
 		let mut mask = self.pieces_mask & (self.pieces_mask >> 1);
 		mask = mask & (mask >> 7);
-		std::iter::from_fn(move || {
-			if mask == 0 {
-				return None;
-			}
+		while mask != 0 {
 			let prev = mask;
 			mask &= mask - 1;
 			let top_left = prev - mask;
 			// Then we find the tile value associated
 			// for each tile.
-			Some(self.tile_at(top_left))
-		})
+			yield self.tile_at(top_left)
+		}
 	}
 
 	/**
@@ -576,6 +559,6 @@ mod tests {
 	fn impossible_move_generating_two_times_the_same_tile() {
 		let board = Board::from_fen("wbbww/wbwbw/b1w1b/bbwww/wwwwb 034567ef").unwrap();
 		println!("{}", board.for_console());
-		assert_eq!(board.possible_moves(), vec![]);
+		assert_eq!(board.possible_moves().collect::<Vec<Move>>(), vec![]);
 	}
 }

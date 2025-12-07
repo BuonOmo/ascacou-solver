@@ -174,7 +174,7 @@ impl Solver {
 	}
 
 	fn fully_explored(&self, node: NodeId, board: Board) -> bool {
-		node.children(&self.arena).count() == board.possible_moves().len()
+		node.children(&self.arena).count() == board.possible_moves().count()
 	}
 
 	fn get_data(&self, node_id: NodeId) -> &NodeData {

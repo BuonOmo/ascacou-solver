@@ -1,4 +1,4 @@
-use ascacou::Board;
+use ascacou::{Board, Move};
 use rand::prelude::*;
 use std::io::Write;
 
@@ -19,7 +19,7 @@ where
 
 fn generate_line(buffer: &mut std::fs::File, moves_left: usize) -> Result<(), &'static str> {
 	let mut board = Board::random_empty();
-	let mut possible_moves = board.possible_moves();
+	let mut possible_moves: Vec<Move> = board.possible_moves().collect();
 	let mut rng = rand::rng();
 	while possible_moves.len() > moves_left {
 		let mov = possible_moves
@@ -29,7 +29,7 @@ fn generate_line(buffer: &mut std::fs::File, moves_left: usize) -> Result<(), &'
 		if board.is_invalid() {
 			return Err("Generated an invalid board");
 		}
-		possible_moves = board.possible_moves();
+		possible_moves = board.possible_moves().collect();
 	}
 
 	buffer

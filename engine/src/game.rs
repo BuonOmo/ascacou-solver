@@ -69,7 +69,7 @@ impl Game {
 			"r" | "rewind" => Action::Rewind,
 			"q" | "quit" => Action::Quit,
 			_ => match Move::try_from(mov_str) {
-				Ok(mov) if self.board.possible_moves().contains(&mov) => Action::Move(mov),
+				Ok(mov) if self.board.possible_moves().any(|m| m == mov) => Action::Move(mov),
 				_ => self.read_move(),
 			},
 		}

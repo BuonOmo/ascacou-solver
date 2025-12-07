@@ -36,7 +36,8 @@ pub fn play(fen: &str, #[wasm_bindgen(js_name = "move")] mov: &str) -> Result<St
 
 #[wasm_bindgen]
 pub fn moves(fen: &str) -> Result<Vec<String>, String> {
-	let moves = Board::from_fen(fen)?.possible_moves();
+	let board = Board::from_fen(fen)?;
+	let moves = board.possible_moves();
 	let mut rv = vec![];
 
 	for mov in moves {

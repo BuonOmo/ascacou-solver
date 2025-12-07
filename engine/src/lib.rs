@@ -1,3 +1,5 @@
+#![feature(gen_blocks)]
+
 pub(crate) mod board;
 pub(crate) mod color;
 pub(crate) mod game;

@@ -1,3 +1,5 @@
+use rand::Rng;
+
 use crate::color::Color;
 use crate::mov::Move;
 use crate::player::Player;
@@ -25,8 +27,8 @@ impl Board {
 		}
 	}
 
-	pub fn random_empty() -> Board {
-		let (current_player, opponent) = Player::random_set();
+	pub fn random_empty<R: Rng>(rng: &mut R) -> Board {
+		let (current_player, opponent) = Player::random_set(rng);
 		Board {
 			pieces_mask: 0,
 			black_mask: 0,

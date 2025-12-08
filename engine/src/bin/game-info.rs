@@ -1,8 +1,9 @@
 use ascacou::{Board, Move};
 
 fn main() {
+	let mut rng = rand::rng();
 	match std::env::args().len() {
-		1 => println!("{}", Board::random_empty()),
+		1 => println!("{}", Board::random_empty(&mut rng)),
 		2 => {
 			let board = std::env::args()
 				.nth(1)

@@ -1,5 +1,7 @@
 use crate::color::Color;
 use crate::tileset::TileSet;
+use rand::Rng;
+use rand::seq::IteratorRandom;
 
 #[derive(PartialEq, Eq, Clone, Copy)]
 pub struct Player {
@@ -16,13 +18,10 @@ impl Player {
 		)
 	}
 
-	pub fn random_set() -> (Player, Player) {
-		use rand::seq::IteratorRandom;
-
-		let mut rng = rand::rng();
+	pub fn random_set<R: Rng>(rng: &mut R) -> (Player, Player) {
 		let mut buf = [0u8; 8];
 
-		(0..16).into_iter().choose_multiple_fill(&mut rng, &mut buf);
+		(0..16).into_iter().choose_multiple_fill(rng, &mut buf);
 		Player::from_current_tiles(buf)
 	}
 

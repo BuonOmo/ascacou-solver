@@ -9,7 +9,7 @@ fn main() {
 	let mut durations = 0;
 	for _i in 0..10_000 {
 		let now = std::time::Instant::now();
-		let mut board = Board::random_empty();
+		let mut board = Board::random_empty(&mut rng);
 		let mut current_player = 1i8;
 		while !board.is_terminal() {
 			current_player = -current_player;

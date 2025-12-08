@@ -98,6 +98,7 @@ impl Solver {
 		mut beta: EvaluationScore,
 		depth: u8,
 	) -> EvaluationScore {
+		debug_assert!(alpha < beta);
 		self.explored_positions += 1;
 
 		let key = key(&board);
@@ -106,6 +107,9 @@ impl Solver {
 		if let Some(cached_beta) = self.transposition_table.get(&key) {
 			if beta > *cached_beta {
 				beta = *cached_beta;
+				if alpha >= beta {
+					return beta;
+				}
 			}
 		}
 

@@ -7,7 +7,7 @@ pub(crate) mod mov;
 pub(crate) mod player;
 pub(crate) mod tileset;
 
-pub use board::{Board, BoardKey};
+pub use board::Board;
 pub use color::Color;
 pub use game::Game;
 pub use mov::Move;

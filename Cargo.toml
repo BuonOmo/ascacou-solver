@@ -18,5 +18,10 @@ split-debuginfo = "packed"
 
 [profile.release]
 # https://fasterthanli.me/articles/why-is-my-rust-build-so-slow
-debug = 1
-split-debuginfo = "packed"
+# debug = 1
+# split-debuginfo = "packed"
+debug = "limited"
+lto = "fat"
+strip = true
+panic = "abort"
+codegen-units = 1

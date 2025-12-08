@@ -211,22 +211,14 @@ impl Board {
 		false
 	}
 
-	// TODO: a smarter score computation could be done by taking into
-	// account each player's score, and give a greater edge to a position
-	// close to terminal. More interesting even is the idea of taking into
-	// account partially filled tiles.
 	pub fn current_score(&self) -> i8 {
-		let mut score = 0;
-
-		for tile in self.filled_tiles() {
+		self.filled_tiles().fold(0, |acc, tile| {
 			if self.current_player.has_tile(tile) {
-				score += 1;
+				acc + 1
 			} else {
-				score -= 1;
+				acc - 1
 			}
-		}
-
-		score
+		})
 	}
 
 	pub fn is_terminal(&self) -> bool {

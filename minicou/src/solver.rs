@@ -1,13 +1,14 @@
-use ascacou::Move;
-use ascacou::{Board, BoardKey};
+use ascacou::{Board, Move};
 
 pub struct Solver {
 	explored_positions: u128,
-	transposition_table: std::collections::HashMap<BoardKey, i8>,
+	transposition_table: std::collections::HashMap<u128, EvaluationScore>,
 }
 
-const MIN_SCORE: i8 = -100;
-const MAX_SCORE: i8 = 100;
+pub use std::primitive::i16 as EvaluationScore;
+
+const MIN_SCORE: EvaluationScore = -100;
+const MAX_SCORE: EvaluationScore = 100;
 
 macro_rules! heuristic_moves {
 	( $first_color:ident => $last_color:ident [ $( ($x:expr, $y:expr) )* ] ) => {
@@ -57,14 +58,14 @@ impl Solver {
 	fn negamax0(
 		&mut self,
 		board: &Board,
-		mut alpha: i8,
-		beta: i8,
+		mut alpha: EvaluationScore,
+		beta: EvaluationScore,
 		depth: u8,
-	) -> (i8, Option<&Move>) {
+	) -> (EvaluationScore, Option<&Move>) {
 		self.explored_positions += 1;
 
 		if depth == 0 {
-			return (score(board), None);
+			return (evaluation(board), None);
 		}
 
 		let moves = possible_moves(&board);
@@ -84,13 +85,19 @@ impl Solver {
 			}
 		}
 		if terminal {
-			alpha = score(board);
+			alpha = evaluation(board);
 		}
 
 		return (alpha, best_mov);
 	}
 
-	fn negamax(&mut self, board: &Board, mut alpha: i8, mut beta: i8, depth: u8) -> i8 {
+	fn negamax(
+		&mut self,
+		board: &Board,
+		mut alpha: EvaluationScore,
+		mut beta: EvaluationScore,
+		depth: u8,
+	) -> EvaluationScore {
 		self.explored_positions += 1;
 
 		let key = key(&board);
@@ -103,7 +110,7 @@ impl Solver {
 		}
 
 		if depth == 0 {
-			return score(board);
+			return evaluation(board);
 		}
 
 		let moves = possible_moves(&board);
@@ -135,7 +142,7 @@ impl Solver {
 		}
 
 		if terminal {
-			alpha = score(&board);
+			alpha = evaluation(&board);
 		}
 
 		self.transposition_table.insert(key, alpha);
@@ -169,11 +176,11 @@ fn key(board: &Board) -> u128 {
 //
 // A _close to terminal_ position would be a position with few
 // available moves.
-fn score(board: &Board) -> i8 {
-	board.current_score()
+fn evaluation(board: &Board) -> EvaluationScore {
+	board.current_score() as EvaluationScore
 }
 
-pub fn solve(board: &Board, depth: Option<u8>) -> (i8, Option<Move>, u128) {
+pub fn solve(board: &Board, depth: Option<u8>) -> (EvaluationScore, Option<Move>, u128) {
 	let mut solver = Solver::new();
 
 	let (score, mov) = solver.negamax0(board, MIN_SCORE, MAX_SCORE, depth.unwrap_or(51));
@@ -181,7 +188,7 @@ pub fn solve(board: &Board, depth: Option<u8>) -> (i8, Option<Move>, u128) {
 	(score, mov.cloned(), solver.explored_positions)
 }
 
-pub fn partial_solve(board: &Board, depth: Option<u8>) -> (i8, Option<Move>, u128) {
+pub fn partial_solve(board: &Board, depth: Option<u8>) -> (EvaluationScore, Option<Move>, u128) {
 	let mut solver = Solver::new();
 
 	let (score, mov) = solver.negamax0(board, -1, 1, depth.unwrap_or(51));

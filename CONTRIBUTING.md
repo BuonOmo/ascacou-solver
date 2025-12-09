@@ -16,3 +16,4 @@
 ## Release process
 
 - [ ] Update the performances benchmark in `README.md`
+- [ ] Run tests

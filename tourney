@@ -4,13 +4,13 @@
 
 set -e
 
- (( $# == 1 )) || {
+(($# == 1)) || {
 	echo "Usage: $0 <commit>"
 	exit 1
 }
 
 target_dir=${CARGO_TARGET_DIR:-target}
-commit=${1}
+commit="$1"
 
 ## Setup
 
@@ -39,15 +39,29 @@ cargo build --release --bin=game-info
 
 ## Play
 
+typeset -A counts=(
+	"endgame" 20
+	"midgame" 5
+	"earlygame" 3
+	"startgame" 3
+)
 new="$target_dir/release/minicou"
 old="$target_dir/$commit/minicou"
 game_info="$target_dir/release/game-info"
-data=(benchmarks/data/*(om))
-# "" (fixes (om))
-typeset -A ais
-ais[-1]=$old
-ais[1]=$new
+data=(benchmarks/data/{endgame,midgame,earlygame,startgame})
+typeset -A ais=(-1 "$old" 1 "$new")
+typeset -A names=(-1 "$commit" 1 "$(git rev-parse --abbrev-ref HEAD)")
 total=0
+
+sign() {
+	if (($1 > 0)); then
+		echo 1
+	elif (($1 < 0)); then
+		echo -1
+	else
+		echo 0
+	fi
+}
 
 next_move() {
 	$game_info "$1" "$2"
@@ -63,19 +77,37 @@ play() {
 	$1 --timeout=1000 --depth=51 $2 | awk '/Move:/ {print $2}'
 }
 
+game() {
+	local board="$1"
+	local order="$2"
+
+	while ! is_terminal "$board"; do
+		move=$(play "${ais[$order]}" "$board")
+		board=$(next_move "$board" "$move")
+		order=$((-order))
+	done
+	echo $(($(score "$board") * order))
+}
+
 for file in $data; do
+	setname=${file:t}
 	for order in -1 1; do
-		echo -n "Playing $file, ${ais[$order]} first. "
+		setscore=0
+		echo -n "Playing ${counts[$setname]} games from $setname set, ${names[$order]} plays first... "
 		while read -r board; do
-			while ! is_terminal "$board"; do
-				move=$(play "${ais[$order]}" "$board")
-				board=$(next_move "$board" "$move")
-				order=$((-order))
-			done
-			s=$(($(score "$board") * order))
-			total=$((total + s))
-		done < <(head -n 10 $file)
-		echo "Total: $total"
+			result=$(game "$board" "$order")
+			setscore=$((setscore + result))
+		done < <(head -n "${counts[$setname]}" "$file")
+		echo "Score: $setscore"
+		total=$((total + setscore))
 	done
 	echo
 done
+
+echo "Final score: $total"
+
+winner=$(sign $total)
+case $winner in
+0) echo "Draw: both versions may be the same..." ;;
+*) echo "${names[$winner]} wins!" ;;
+esac

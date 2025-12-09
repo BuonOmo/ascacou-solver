@@ -3,7 +3,15 @@ resolver = "3"
 members = ["alphacou", "engine", "minicou", "py", "wasm", "benchmarks"]
 
 [workspace.package]
+authors = ["Ulysse <buonomo.ulysse@gmail.com>"]
+version = "0.1.0"
 edition = "2024"
+license = "GPL-3.0-or-later"
+repository = "https://github.com/BuonOmo/ascacou-solver"
+homepage = repository
+documentation = "https://docs.rs/ascacou-solver"
+readme = "README.md"
+publish = false
 
 [workspace.dependencies]
 ascacou = { path = "engine" }

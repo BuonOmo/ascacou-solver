@@ -3,6 +3,8 @@ name = "alphacou"
 description = "A monte-carlo tree search based AI for ascacou"
 version = "0.1.0"
 edition.workspace = true
+publish.workspace = true
+license.workspace = true
 
 [[bin]]
 name = "alphacou"

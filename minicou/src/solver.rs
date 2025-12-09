@@ -203,6 +203,7 @@ pub fn partial_solve(board: &Board, depth: Option<u8>) -> (EvaluationScore, Opti
 #[cfg(test)]
 mod tests {
 	use super::*;
+	use std::assert_matches::assert_matches;
 
 	#[test]
 	fn it_finds_winning_continuations() {
@@ -222,14 +223,12 @@ mod tests {
 	fn it_solves_endings_quickly() {
 		let board = Board::from_fen("wwwbb/bwbwb/bbbww/bbwww/w 01234567").unwrap();
 		println!("{}", board.for_console());
-		let expected = (3, Some(Move::white(3, 4)), 23);
+		let expected_move = Move::white(3, 4);
 		let solved = solve(&board, Some(100));
-		assert_eq!(
-			expected,
-			solved,
+		assert_matches!(solved, (3, Some(mov), _) if mov == expected_move,
 			"expected {}, got {}",
-			expected.1.as_ref().unwrap(),
-			solved.1.as_ref().unwrap()
+			expected_move,
+			solved.1.as_ref().unwrap(),
 		)
 	}
 

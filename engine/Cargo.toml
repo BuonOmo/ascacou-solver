@@ -5,18 +5,13 @@ version = "0.1.0"
 edition.workspace = true
 
 [[bin]]
-name = "stats"
-description = "some statics on expeted winrate"
-path = "src/bin/stats.rs"
-
-[[bin]]
 name = "console"
-description = "play in the console (TODO: change to some other package, allow ia choice)"
+# Play in the console (TODO: change to some other package, allow ai choice).
 path = "src/bin/console.rs"
 
 [[bin]]
 name = "game-info"
-description = "allow for quick and dirty interface with bash, should change to a rust backend/frontend interface"
+# Allow for quick and dirty interface with bash, should change to a rust backend/frontend interface.
 path = "src/bin/game-info.rs"
 
 [dependencies]

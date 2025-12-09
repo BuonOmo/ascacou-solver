@@ -3,6 +3,7 @@ extern crate ascacou;
 use ascacou::{Board, Game};
 
 fn main() {
+	// Color samples
 	for i in 0..=9 {
 		for j in 0..=9 {
 			print!("\x1b[4{};3{}m ●", i, j);

@@ -35,7 +35,6 @@ impl Game {
 				"Possible moves: {}",
 				self.board
 					.possible_moves()
-					.into_iter()
 					.map(String::from)
 					.collect::<Vec<String>>()
 					.join(", ")

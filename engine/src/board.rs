@@ -161,11 +161,7 @@ impl Board {
 				}
 
 				if idx > 0 {
-					if x + idx < 5 {
-						// We only add it if not at the end
-						// of the row.
-						str += &idx.to_string();
-					}
+					str += &idx.to_string();
 					idx = 0
 				}
 				str.push_str(if Board::position_mask(x, y) & self.black_mask == 0 {
@@ -554,5 +550,13 @@ mod tests {
 		let board = Board::from_fen("wbbww/wbwbw/b1w1b/bbwww/wwwwb 034567ef").unwrap();
 		println!("{}", board.for_console());
 		assert_eq!(board.possible_moves().collect::<Vec<Move>>(), vec![]);
+	}
+
+	#[test]
+	fn fen_is_consistent() {
+		let mut fen = "2b1b/wwb1w/w1bw/bw1w/bw2b 137abcdf";
+		assert_eq!(Board::from_fen(fen).unwrap().fen(), fen);
+		fen = "5/5/5/5/5 01234567";
+		assert_eq!(Board::from_fen(fen).unwrap().fen(), "//// 01234567");
 	}
 }

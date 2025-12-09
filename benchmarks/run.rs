@@ -89,6 +89,23 @@ fn format_depth(depth: u8, max_depth: u8, is_partial: bool) -> String {
 	)
 }
 
+/// Format a u128 with spaces as thousands separators.
+///
+/// ```
+/// assert_eq!(format_thousands(1234567890), "1 234 567 890");
+/// assert_eq!(format_thousands(1234), "1 234");
+/// assert_eq!(format_thousands(123), "123");
+/// ```
+fn format_thousands(value: u128) -> String {
+	let mut s = value.to_string();
+	let mut i = s.len() as isize - 3;
+	while i > 0 {
+		s.insert(i as usize, ' ');
+		i -= 3;
+	}
+	s
+}
+
 fn set_dir() -> EmptyResult {
 	let dir = std::path::Path::new("benchmarks/data");
 	if !dir.exists() {
@@ -218,7 +235,7 @@ fn main() -> EmptyResult {
 					file.to_string(),
 					format_depth(depth, max_depth, partial),
 					format!("{:.2?}", avg_duration),
-					avg_positions.to_string(),
+					format_thousands(avg_positions),
 					format_pos_per_ms(avg_positions, avg_duration),
 				],
 				Err(_) => [

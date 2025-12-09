@@ -12,3 +12,7 @@
     No algorithm change.
   - `tests`: adding or updating tests
 	- `docs`: updating documentation
+
+## Release process
+
+- [ ] Update the performances benchmark in `README.md`

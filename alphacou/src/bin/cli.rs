@@ -7,7 +7,7 @@ use std::time::Duration;
 #[clap(about, author, version)]
 struct Args {
 	/// Name of the person to greet
-	#[clap(parse(try_from_str = Board::from_fen), default_value_t = Board::empty())]
+	#[clap(value_parser = Board::from_fen, default_value_t = Board::empty())]
 	board: Board,
 
 	/// Number of times for the IA to find a move (in s)

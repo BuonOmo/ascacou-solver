@@ -1,0 +1,81 @@
+#!/usr/bin/env zsh
+#
+# Usage: ./tourney <commit>
+
+set -e
+
+ (( $# == 1 )) || {
+	echo "Usage: $0 <commit>"
+	exit 1
+}
+
+target_dir=${CARGO_TARGET_DIR:-target}
+commit=${1}
+
+## Setup
+
+# Generate benchmarks/data
+[[ -d "benchmarks/data" ]] || cargo run --bin generate
+
+# Build previous version
+[[ -f "$target_dir/$commit/minicou" ]] || {
+	should_stash=$(git diff --exit-code --quiet && echo false || echo true)
+	if [ "$should_stash" = true ]; then
+		git stash push -m "tourney temporary stash"
+	fi
+	git checkout $1
+	cargo build --release -Zunstable-options --features=cli --bin=minicou --artifact-dir $target_dir/$commit
+	git checkout -
+	if [ "$should_stash" = true ]; then
+		git stash pop
+	fi
+}
+
+# Build current version
+cargo build --release --features=cli --bin=minicou
+
+# Build game-info tool
+cargo build --release --bin=game-info
+
+## Play
+
+new="$target_dir/release/minicou"
+old="$target_dir/$commit/minicou"
+game_info="$target_dir/release/game-info"
+data=(benchmarks/data/*(om))
+# "" (fixes (om))
+typeset -A ais
+ais[-1]=$old
+ais[1]=$new
+total=0
+
+next_move() {
+	$game_info "$1" "$2"
+}
+is_terminal() {
+	$game_info "$1" | awk '{print $1}' | grep -q '^true$'
+}
+score() {
+	$game_info "$1" | awk '{print $2}'
+}
+
+play() {
+	$1 --timeout=1000 --depth=51 $2 | awk '/Move:/ {print $2}'
+}
+
+for file in $data; do
+	for order in -1 1; do
+		echo -n "Playing $file, ${ais[$order]} first. "
+		while read -r board; do
+			while ! is_terminal "$board"; do
+				move=$(play "${ais[$order]}" "$board")
+				board=$(next_move "$board" "$move")
+				order=$((-order))
+			done
+			s=$(($(score "$board") * order))
+			total=$((total + s))
+		done < <(head -n 10 $file)
+		echo "Total: $total"
+	done
+	echo
+done

@@ -187,7 +187,11 @@ fn evaluation(board: &Board) -> EvaluationScore {
 pub fn solve(board: &Board, depth: Option<u8>) -> (EvaluationScore, Option<Move>, u128) {
 	let mut solver = Solver::new();
 
-	let (score, mov) = solver.negamax0(board, MIN_SCORE, MAX_SCORE, depth.unwrap_or(51));
+	let move_count: usize = board.possible_moves().count();
+	let max_depth = (move_count + 1) / 2;
+	let depth = depth.unwrap_or(max_depth as u8).min(max_depth as u8);
+
+	let (score, mov) = solver.negamax0(board, MIN_SCORE, MAX_SCORE, depth);
 
 	(score, mov.cloned(), solver.explored_positions)
 }
@@ -195,7 +199,11 @@ pub fn solve(board: &Board, depth: Option<u8>) -> (EvaluationScore, Option<Move>
 pub fn partial_solve(board: &Board, depth: Option<u8>) -> (EvaluationScore, Option<Move>, u128) {
 	let mut solver = Solver::new();
 
-	let (score, mov) = solver.negamax0(board, -1, 1, depth.unwrap_or(51));
+	let move_count: usize = board.possible_moves().count();
+	let max_depth = (move_count + 1) / 2;
+	let depth = depth.unwrap_or(max_depth as u8).min(max_depth as u8);
+
+	let (score, mov) = solver.negamax0(board, -1, 1, depth);
 
 	(score, mov.cloned(), solver.explored_positions)
 }

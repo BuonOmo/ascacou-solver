@@ -11,8 +11,8 @@ struct Args {
 	#[clap(value_parser = Board::from_fen, default_value_t = Board::empty())]
 	board: Board,
 
-	/// Maximum search depth (5-51)
-	#[clap(short, long, default_value_t = 8, value_parser = clap::value_parser!(u8).range(5..=51))]
+	/// Maximum search depth (5-25)
+	#[clap(short, long, default_value_t = 8, value_parser = clap::value_parser!(u8).range(5..=25))]
 	depth: u8,
 
 	/// Strict timeout in milliseconds

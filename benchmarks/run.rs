@@ -25,47 +25,45 @@ fn run_group(
 	file: impl AsRef<str>,
 	max_depth: u8,
 	is_partial: bool,
-	iterations: usize,
+	max_time_ms: u128,
 ) -> SimpleResult<(u8, Duration, u128)> {
 	let content =
 		std::fs::read_to_string(file.as_ref()).map_err(|_| "Could not read benchmark file")?;
 	let mut total_duration = Duration::ZERO;
 	let mut total_positions = 0u128;
-	let lines: Vec<&str> = content.lines().collect();
-	let count = lines.len();
-	let count = if count > iterations {
-		iterations
-	} else {
-		count
-	};
-	let depth = find_depth(lines[0], max_depth, is_partial)?;
+	let mut lines = content.lines().peekable();
+	let depth = find_depth(lines.peek().unwrap(), max_depth, max_time_ms, is_partial)?;
 	let mut i = 0;
 	for line in lines {
 		i += 1;
-		if i > count {
+		if total_duration.as_millis() > max_time_ms {
 			break;
 		}
 		let (duration, positions) = run_one(line, depth, is_partial)?;
 		total_duration += duration;
 		total_positions += positions;
 	}
-	let avg_duration = total_duration / count as u32;
-	let avg_positions = total_positions / count as u128;
+	let avg_duration = total_duration / i as u32;
+	let avg_positions = total_positions / i as u128;
 
 	Ok((depth, avg_duration, avg_positions))
 }
 
-fn find_depth(fen: &str, max_depth: u8, is_partial: bool) -> SimpleResult<u8> {
-	let mut max = 1;
-	for i in 2..=max_depth {
+fn find_depth(
+	fen: &str,
+	max_depth: u8,
+	max_duration_ms: u128,
+	is_partial: bool,
+) -> SimpleResult<u8> {
+	let mut i = 4;
+	loop {
 		let (duration, _) = run_one(fen, i, is_partial)?;
-		if duration.as_secs_f64() > 5.0 {
+		if duration.as_millis() > max_duration_ms / 20 || i >= max_depth {
 			break;
-		} else {
-			max = i;
 		}
+		i += 1;
 	}
-	Ok(max)
+	Ok(i)
 }
 
 fn format_pos_per_ms(positions: u128, duration: Duration) -> String {
@@ -227,10 +225,14 @@ fn main() -> EmptyResult {
 		Alignment::Right,
 		Alignment::Right,
 	];
-	let headers = ["sample", "depth", "avg time", "avg n pos", "pos/ms"].map(String::from);
+	let headers = ["set", "depth", "avg time", "avg n pos", "pos/ms"].map(String::from);
 	let body: Vec<[String; 5]> = iterations()
-		.map(
-			|(partial, file, max_depth)| match run_group(file, max_depth, partial, 10) {
+		.map(|(partial, file, max_depth)| {
+			println!(
+				"Running {} solver for {file} set",
+				if partial { "partial" } else { "full" }
+			);
+			match run_group(file, max_depth, partial, 20_000) {
 				Ok((depth, avg_duration, avg_positions)) => [
 					file.to_string(),
 					format_depth(depth, max_depth, partial),
@@ -245,8 +247,8 @@ fn main() -> EmptyResult {
 					"n/a".to_string(),
 					"n/a".to_string(),
 				],
-			},
-		)
+			}
+		})
 		.collect();
 
 	let table = generate_table(alignments, headers, body);

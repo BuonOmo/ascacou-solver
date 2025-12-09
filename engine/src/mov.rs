@@ -120,6 +120,12 @@ impl std::fmt::Display for Move {
 	}
 }
 
+impl From<&Move> for String {
+	fn from(mov: &Move) -> Self {
+		format!("{}", mov)
+	}
+}
+
 impl From<Move> for String {
 	fn from(mov: Move) -> Self {
 		format!("{}", mov)

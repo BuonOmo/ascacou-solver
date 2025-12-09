@@ -10,6 +10,27 @@ pub use std::primitive::i16 as EvaluationScore;
 const MIN_SCORE: EvaluationScore = -100;
 const MAX_SCORE: EvaluationScore = 100;
 
+/// Depth of forced moves search. These moves will
+/// be explored when depth is exhausted to make sure
+/// we compute an evaluation score as close to the
+/// endgame as possible.
+///
+/// The value 3 was chosen empirically using the
+/// `tourney` tests on a small set of boards. Here
+/// is the results:
+///
+/// | forced depth | mid | early | start | total |
+/// | -----------: | --: | ----: | ----: | ----: |
+/// |            0 |   0 |    -1 |     0 |    -1 |
+/// |            1 |  -2 |     1 |     2 |     1 |
+/// |            2 |  -1 |     0 |    -1 |    -2 |
+/// |            3 |  -1 |     3 |     2 |     4 |
+/// |            4 |  -2 |     1 |     1 |     0 |
+/// |            5 |  -2 |    -1 |     0 |    -3 |
+/// |            6 |  -1 |     0 |     3 |     2 |
+/// |            7 |  -1 |    -3 |     4 |     0 |
+const FORCED_MOVE_DEPTH: u8 = 3;
+
 macro_rules! heuristic_moves {
 	( $first_color:ident => $last_color:ident [ $( ($x:expr, $y:expr) )* ] ) => {
 		[
@@ -68,7 +89,7 @@ impl Solver {
 			return (evaluation(board), None);
 		}
 
-		let moves = possible_moves(&board);
+		let moves = possible_moves(&board, false);
 
 		let mut best_mov: Option<&Move> = None;
 		let mut terminal = true;
@@ -117,7 +138,7 @@ impl Solver {
 			return evaluation(board);
 		}
 
-		let moves = possible_moves(&board);
+		let moves = possible_moves(&board, depth <= FORCED_MOVE_DEPTH);
 
 		let mut terminal = true;
 
@@ -154,16 +175,24 @@ impl Solver {
 	}
 }
 
-fn possible_moves<'a>(board: &Board) -> impl Iterator<Item = &'a Move> {
+gen fn possible_moves(board: &Board, forced: bool) -> &'static Move {
+	if forced {
+		for mov in forced_moves(&board) {
+			yield mov;
+		}
+		return;
+	}
 	let black_fav = board.current_player.favorite_color == ascacou::Color::Black;
 	let preferred_heuristic = if black_fav {
 		&HEURISTIC_BLACK_FIRST
 	} else {
 		&HEURISTIC_WHITE_FIRST
 	};
-	preferred_heuristic
-		.iter()
-		.filter(|mov| board.is_move_possible(mov))
+	for mov in preferred_heuristic {
+		if board.is_move_possible(mov) {
+			yield mov;
+		}
+	}
 }
 
 // TODO(perf): Design a u64 key, and try partial key matching.
@@ -175,13 +204,28 @@ fn key(board: &Board) -> u128 {
 // TODO: a smarter score computation could be done by taking into
 // account each player's score, and give a greater edge to a position
 // close to terminal. More interesting even is the idea of taking into
-// account partially filled tiles, e.g. forcing moves where only
+// account partially filled tiles, e.g. forced moves where only
 // one color can be played to fill a tile.
 //
 // A _close to terminal_ position would be a position with few
 // available moves.
 fn evaluation(board: &Board) -> EvaluationScore {
 	board.current_score() as EvaluationScore
+}
+
+gen fn forced_moves(board: &Board) -> &'static Move {
+	let len = HEURISTIC_BLACK_FIRST.len() / 2;
+	for i in 0..HEURISTIC_BLACK_FIRST.len() / 2 {
+		let mov_black = &HEURISTIC_BLACK_FIRST[i];
+		let mov_white = &HEURISTIC_BLACK_FIRST[len + i];
+		let black_possible = board.is_move_possible(mov_black);
+		let white_possible = board.is_move_possible(mov_white);
+		if black_possible && !white_possible {
+			yield mov_black;
+		} else if white_possible && !black_possible {
+			yield mov_white;
+		}
+	}
 }
 
 pub fn solve(board: &Board, depth: Option<u8>) -> (EvaluationScore, Option<Move>, u128) {
@@ -199,8 +243,13 @@ pub fn solve(board: &Board, depth: Option<u8>) -> (EvaluationScore, Option<Move>
 pub fn partial_solve(board: &Board, depth: Option<u8>) -> (EvaluationScore, Option<Move>, u128) {
 	let mut solver = Solver::new();
 
-	let move_count: usize = board.possible_moves().count();
-	let max_depth = (move_count + 1) / 2;
+	let move_count: u8 = board.possible_moves().count() as u8;
+	// Adding FORCED_MOVE_DEPTH to the max depth to ensure we
+	// explore non-forcing moves up to the maximum if we can
+	// and only rely on forced moves if we cannot explore
+	// to full depth. Otherwise, we may end up not exploring
+	// some non-forced last moves.
+	let max_depth = (move_count + 1) / 2 + FORCED_MOVE_DEPTH;
 	let depth = depth.unwrap_or(max_depth as u8).min(max_depth as u8);
 
 	let (score, mov) = solver.negamax0(board, -1, 1, depth);
@@ -213,6 +262,31 @@ mod tests {
 	use super::*;
 	use std::assert_matches::assert_matches;
 
+	#[test]
+	fn test_forced_moves() {
+		for (fen, expected) in [
+			("bwwb/2www/3wb/bbw/1w1wb 025689ad", vec![]),
+			(
+				"bb1ww/www1w/1bb/1bww/2w 013457df",
+				vec!["wd3", "wa3", "wc1"],
+			),
+			("wwbw/bb2b/1wwb/2b/wb1wb 124589ef", vec!["wb4"]),
+			("w3w/wbbbb/2b1b/2bw/bwb1w 013568be", vec!["wd3"]),
+			("bww/1bb1w/wb/1wwbw/1www 0149bcde", vec!["ba4"]),
+			("wbbbb/b2ww/bbw/b1b/1b1b 13678adf", vec!["bc2"]),
+			(
+				// This is a case where there are ony two non-forced moves left.
+				"bbwwb/bbwww/b3b/bwwww/2w1b 01389cdf",
+				vec!["bd3", "bb5", "bd5"],
+			),
+			("bww/1w1ww/2wwb/1wbb/1b1ww 023679ab", vec!["bb3"]),
+			("bw2b/ww2b/bww1w/w1b/w1w1b 12346cdf", vec!["bb4"]),
+		] {
+			let board = Board::from_fen(fen).unwrap();
+			let forced: Vec<String> = forced_moves(&board).map(String::from).collect();
+			assert_eq!(forced, expected, "for board:\n{}", board.for_console());
+		}
+	}
 	#[test]
 	fn it_finds_winning_continuations() {
 		let board = Board::from_fen("2bbw/bww1w/w1w1w/1w1bw/wbb1b 013679ce").unwrap();

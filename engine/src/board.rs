@@ -176,9 +176,9 @@ impl Board {
 	}
 
 	pub gen fn possible_moves(&self) -> Move {
-		for color in [Color::Black, Color::White] {
-			for x in 0..5 {
-				for y in 0..5 {
+		for x in 0..5 {
+			for y in 0..5 {
+				for color in [Color::Black, Color::White] {
 					let mov = Move::new(x, y, color);
 					if self.is_move_possible(&mov) {
 						yield mov;
@@ -425,12 +425,15 @@ impl Board {
 				str.push_str(" ");
 
 				if self.pieces_mask & position == 0 {
-					if self.next(&Move::black(x, y)).is_invalid()
-						&& self.next(&Move::white(x, y)).is_invalid()
-					{
-						str.push_str("\x1b[30mx");
-					} else {
-						str.push_str("\x1b[30m·");
+					str.push_str("\x1b[30m");
+					match (
+						self.next(&Move::black(x, y)).is_invalid(),
+						self.next(&Move::white(x, y)).is_invalid(),
+					) {
+						(false, false) => str.push('·'),
+						(false, true) => str.push('b'),
+						(true, false) => str.push('w'),
+						(true, true) => str.push('x'),
 					}
 				} else if self.black_mask & position != 0 {
 					str.push_str(format!("{}●", Color::Black).as_str());

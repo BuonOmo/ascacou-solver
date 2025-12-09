@@ -1,4 +1,5 @@
 #![feature(assert_matches)]
+#![feature(gen_blocks)]
 
 mod solver;
 

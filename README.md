@@ -3,16 +3,16 @@
 ## Benchmark
 
 <!-- AUTOMAGICALLY ADDED, SEE BENCHMARKS CRATE -->
-| sample    | depth           | avg time |   avg n pos | pos/ms |
+| set       | depth           | avg time |   avg n pos | pos/ms |
 | --------- | --------------- | -------: | ----------: | -----: |
-| endgame   | 21/21 (partial) |   2.63ms |      14 357 |  5.45K |
-| midgame   | 23/31 (partial) |    5.55s |  31 110 946 |  5.60K |
-| earlygame | 11/41 (partial) |   21.44s | 250 089 159 | 11.66K |
-| startgame | 8/51 (partial)  | 476.99ms |  10 588 998 | 22.20K |
-| endgame   | 21/21           |   4.20ms |      22 295 |  5.30K |
-| midgame   | 31/31           |    8.28s |  46 599 666 |  5.63K |
-| earlygame | 10/41           |    6.07s |  78 737 375 | 12.97K |
-| startgame | 8/51            | 537.14ms |  11 683 286 | 21.75K |
+| endgame   | 10/10 (partial) |   6.91ms |      15 737 |  2.28K |
+| midgame   | 10/15 (partial) | 757.92ms |   5 513 004 |  7.27K |
+| earlygame | 9/20 (partial)  |    2.09s |  24 448 344 | 11.71K |
+| startgame | 9/25 (partial)  |    7.40s | 150 004 100 | 20.28K |
+| endgame   | 10/10           |   5.67ms |      29 951 |  5.28K |
+| midgame   | 11/15           |    2.55s |  18 757 289 |  7.37K |
+| earlygame | 9/20            |    2.23s |  31 628 285 | 14.20K |
+| startgame | 9/25            |    8.25s | 155 323 168 | 18.82K |
 <!-- AUTOMAGICALLY ADDED, SEE BENCHMARKS CRATE -->
 
 20000 chiffre/chiffre

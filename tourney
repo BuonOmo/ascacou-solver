@@ -15,10 +15,10 @@ commit="$1"
 ## Setup
 
 # Generate benchmarks/data
-[[ -d "benchmarks/data" ]] || cargo run --bin generate
+[[ -d "benchmarks/data" ]] && echo "Benchmarks data already generated. Skipping" || cargo run --bin generate
 
 # Build previous version
-[[ -f "$target_dir/$commit/minicou" ]] || {
+[[ -f "$target_dir/$commit/minicou" ]] && echo "Version $commit already built. Skipping" || {
 	should_stash=$(git diff --exit-code --quiet && echo false || echo true)
 	if [ "$should_stash" = true ]; then
 		git stash push -m "tourney temporary stash"
@@ -40,7 +40,7 @@ cargo build --release --bin=game-info
 ## Play
 
 typeset -A counts=(
-	"endgame" 20
+	"endgame" 10
 	"midgame" 5
 	"earlygame" 3
 	"startgame" 3

@@ -4,7 +4,7 @@ use std::sync::mpsc;
 use std::thread;
 use std::time::Instant;
 
-#[derive(Parser)]
+#[derive(Parser, Debug)]
 #[clap(about, author, version)]
 struct Args {
 	/// Board in FEN format
@@ -50,7 +50,10 @@ fn main() {
 		}
 		time_left = timeout.saturating_sub(Instant::now() - t0);
 	}
-	let ((score, mov, explored_positions), depth) = best_result.expect("No result found");
+	let ((score, mov, explored_positions), depth) = best_result.expect(&format!(
+		"Could not find a solution.\nCalled with:\n{:#?}",
+		args
+	));
 
 	println!("Move: {}", mov);
 	println!("Time: {:.2?}", Instant::now() - t0);

@@ -317,9 +317,10 @@ mod tests {
 	#[test]
 	#[ignore = "too slow, shall be used as a benchmark."]
 	fn depths() {
-		for i in 1..25 {
-			// let board = Board::from_fen("5/5/5/5/5").unwrap();
-			let board = Board::from_fen("1wbw/2b/1bb/5/5 01234567").unwrap();
+		// Once This passes, we can consider that Ascacou is
+		// strongly solved.
+		for i in 1..(25 + FORCED_MOVE_DEPTH) {
+			let board = Board::empty();
 			let now = std::time::Instant::now();
 			let (.., explored_positions) = solve(&board, Some(i));
 			let duration = now.elapsed().as_secs_f32();
@@ -338,9 +339,8 @@ mod tests {
 	#[test]
 	#[ignore = "too slow, shall be used as a benchmark."]
 	fn depths_partial() {
-		for i in 1..25 {
-			// let board = Board::from_fen("5/5/5/5/5").unwrap();
-			let board = Board::from_fen("1wbw/2b/1bb/5/5 01234567").unwrap();
+		for i in 1..(25 + FORCED_MOVE_DEPTH) {
+			let board = Board::empty();
 			let now = std::time::Instant::now();
 			let (.., explored_positions) = partial_solve(&board, Some(i));
 			let duration = now.elapsed().as_secs_f32();

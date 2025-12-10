@@ -36,7 +36,10 @@ fn main() {
 	thread::spawn(move || {
 		let mut depth = 4;
 		while depth < max_depth {
-			tx.send(run_solver(&board, depth).zip(Some(depth))).unwrap();
+			tx.send(
+				run_solver(&board, depth).map(|(eval, mov, explored)| (eval, mov, explored, depth)),
+			)
+			.unwrap();
 			depth += 1;
 		}
 	});
@@ -50,8 +53,8 @@ fn main() {
 		}
 		time_left = timeout.saturating_sub(Instant::now() - t0);
 	}
-	let ((score, mov, explored_positions), depth) = best_result.expect(&format!(
-		"Could not find a solution.\nCalled with:\n{:#?}",
+	let (score, mov, explored_positions, depth) = best_result.expect(&format!(
+		"Could not find a solution. Called with:\n{:#?}",
 		args
 	));
 

@@ -14,7 +14,6 @@ pub struct Board {
 	pub current_player: Player,
 	opponent: Player,
 	pub played_tiles: TileSet,
-	// pub possible_moves: &'a Vec<u8>
 }
 
 impl Board {
@@ -148,7 +147,7 @@ impl Board {
 			black_mask,
 			current_player,
 			opponent,
-			played_tiles: TileSet::from_iter(filled_tiles(&pieces_mask, &black_mask)),
+			played_tiles: TileSet::from_iter(filled_tiles(pieces_mask, black_mask)),
 		})
 	}
 
@@ -224,8 +223,6 @@ impl Board {
 		})
 	}
 
-	// TODO: what is the best option: using `already_played_or_dup_move()`
-	// or `next().is_invalid()` ?
 	pub fn is_terminal(&self) -> bool {
 		self.played_tiles.full() || self.possible_moves().next().is_none()
 	}
@@ -240,9 +237,10 @@ impl Board {
 	 * is o(n), it is still quite computation heavy since
 	 * we have to call `tile_at()` for each filled tile.
 	 * Hence cost is roughly: 2 + 6 * n operations.
+	 * TODO: update comment.
 	 */
-	fn filled_tiles(&self) -> impl Iterator<Item = u8> {
-		filled_tiles(&self.pieces_mask, &self.black_mask)
+	fn filled_tiles(&self) -> FilledTilesIterator {
+		filled_tiles(self.pieces_mask, self.black_mask)
 	}
 
 	/**
@@ -314,7 +312,7 @@ impl Board {
 			self.black_mask
 		};
 
-		for tile in filled_tiles(&new_mask, &new_black_mask) {
+		for tile in filled_tiles(new_mask, new_black_mask) {
 			tiles = tiles.try_add(tile)?;
 		}
 
@@ -398,17 +396,33 @@ impl Board {
 	}
 }
 
-gen fn filled_tiles<'a>(pieces_mask: &'a u64, black_mask: &'a u64) -> u8 {
-	// First, we retrieve every top-left corners of filled tiles
-	let mut mask = pieces_mask & (pieces_mask >> 1);
+fn filled_tiles(pieces_mask: u64, black_mask: u64) -> FilledTilesIterator {
+	let mut mask = pieces_mask;
+	// 1 1 & 1 0 = 1 0
+	// 1 1   1 0   1 0
+	mask = mask & (mask >> 1);
+	// 1 0 & 1 0 = 1 0
+	// 1 0   0 0   0 0
 	mask = mask & (mask >> 7);
-	while mask != 0 {
-		let prev = mask;
-		mask &= mask - 1;
-		let top_left = prev - mask;
-		// Then we find the tile value associated
-		// for each tile.
-		yield tile_at(black_mask, top_left)
+	FilledTilesIterator { mask, black_mask }
+}
+
+struct FilledTilesIterator {
+	mask: u64,
+	black_mask: u64,
+}
+
+impl Iterator for FilledTilesIterator {
+	type Item = u8;
+
+	fn next(&mut self) -> Option<Self::Item> {
+		if self.mask == 0 {
+			return None;
+		}
+		let prev = self.mask;
+		self.mask &= self.mask - 1;
+		let top_left = prev - self.mask;
+		Some(tile_at(&self.black_mask, top_left))
 	}
 }
 

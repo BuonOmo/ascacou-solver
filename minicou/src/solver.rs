@@ -175,6 +175,7 @@ impl Solver {
 	}
 }
 
+// TODO: use Iterator trait rather than generators.
 gen fn next_boards_and_moves(board: &Board, forced: bool) -> (Board, &'static Move) {
 	if forced {
 		let len = HEURISTIC_BLACK_FIRST.len() / 2;

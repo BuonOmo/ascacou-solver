@@ -95,7 +95,7 @@ impl Solver {
 		let mut terminal = true;
 		for mov in moves {
 			terminal = false;
-			let score = -self.negamax(&board.next(&mov), -beta, -alpha, depth - 1);
+			let score = -self.negamax(&board.next(&mov).unwrap(), -beta, -alpha, depth - 1);
 			if score >= beta {
 				return (score, Some(&mov));
 			}
@@ -155,7 +155,7 @@ impl Solver {
 			//
 			//  a simple implementation of this idea only yields a quite small improvement (from 1.9ms to 1.7ms for a
 			//  full random game simulation)
-			let score = -self.negamax(&board.next(&mov), -beta, -alpha, depth - 1);
+			let score = -self.negamax(&board.next(&mov).unwrap(), -beta, -alpha, depth - 1);
 
 			if score >= beta {
 				return score;
@@ -172,6 +172,21 @@ impl Solver {
 
 		self.transposition_table.insert(key, alpha);
 		return alpha;
+	}
+}
+
+gen fn forced_moves(board: &Board) -> &'static Move {
+	let len = HEURISTIC_BLACK_FIRST.len() / 2;
+	for i in 0..HEURISTIC_BLACK_FIRST.len() / 2 {
+		let mov_black = &HEURISTIC_BLACK_FIRST[i];
+		let mov_white = &HEURISTIC_BLACK_FIRST[len + i];
+		let black_possible = board.is_move_possible(mov_black);
+		let white_possible = board.is_move_possible(mov_white);
+		if black_possible && !white_possible {
+			yield mov_black;
+		} else if white_possible && !black_possible {
+			yield mov_white;
+		}
 	}
 }
 
@@ -211,21 +226,6 @@ fn key(board: &Board) -> u128 {
 // available moves.
 fn evaluation(board: &Board) -> EvaluationScore {
 	board.current_score() as EvaluationScore
-}
-
-gen fn forced_moves(board: &Board) -> &'static Move {
-	let len = HEURISTIC_BLACK_FIRST.len() / 2;
-	for i in 0..HEURISTIC_BLACK_FIRST.len() / 2 {
-		let mov_black = &HEURISTIC_BLACK_FIRST[i];
-		let mov_white = &HEURISTIC_BLACK_FIRST[len + i];
-		let black_possible = board.is_move_possible(mov_black);
-		let white_possible = board.is_move_possible(mov_white);
-		if black_possible && !white_possible {
-			yield mov_black;
-		} else if white_possible && !black_possible {
-			yield mov_white;
-		}
-	}
 }
 
 pub fn solve(board: &Board, depth: Option<u8>) -> (EvaluationScore, Option<Move>, u128) {

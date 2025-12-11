@@ -13,6 +13,7 @@ pub struct Board {
 	pub black_mask: u64,
 	pub current_player: Player,
 	opponent: Player,
+	pub played_tiles: TileSet,
 	// pub possible_moves: &'a Vec<u8>
 }
 
@@ -24,6 +25,7 @@ impl Board {
 			black_mask: 0,
 			current_player,
 			opponent,
+			played_tiles: TileSet::new_unchecked(0),
 		}
 	}
 
@@ -34,6 +36,7 @@ impl Board {
 			black_mask: 0,
 			current_player,
 			opponent,
+			played_tiles: TileSet::new_unchecked(0),
 		}
 	}
 
@@ -138,12 +141,14 @@ impl Board {
 		}
 
 		let (current_player, opponent) = Player::from_current_tiles(tiles);
+		let pieces_mask = black_mask | white_mask;
 
 		Ok(Board {
-			pieces_mask: (black_mask | white_mask),
+			pieces_mask,
 			black_mask,
 			current_player,
 			opponent,
+			played_tiles: TileSet::from_iter(filled_tiles(&black_mask, &white_mask)),
 		})
 	}
 
@@ -192,7 +197,7 @@ impl Board {
 		if Board::position_mask(mov.x, mov.y) & self.pieces_mask != 0 {
 			return false;
 		}
-		if self.next(mov).is_invalid() {
+		if self.already_played_or_dup_move(mov) {
 			return false;
 		}
 		true
@@ -219,9 +224,9 @@ impl Board {
 		})
 	}
 
+	// TODO: what is the best option: using `already_played_or_dup_move()`
+	// or `next().is_invalid()` ?
 	pub fn is_terminal(&self) -> bool {
-		let tiles = &TileSet::from_iter(self.filled_tiles());
-
 		for x in 0..5 {
 			for y in 0..5 {
 				// Already a piece there.
@@ -231,7 +236,7 @@ impl Board {
 
 				for color in [Color::Black, Color::White] {
 					let mov = Move::new(x, y, color);
-					if self.already_played_or_dup_move(&mov, tiles) {
+					if self.already_played_or_dup_move(&mov) {
 						continue;
 					}
 
@@ -254,26 +259,16 @@ impl Board {
 	 * we have to call `tile_at()` for each filled tile.
 	 * Hence cost is roughly: 2 + 6 * n operations.
 	 */
-	gen fn filled_tiles(&self) -> u8 {
-		// First, we retrieve every top-left corners of filled tiles
-		let mut mask = self.pieces_mask & (self.pieces_mask >> 1);
-		mask = mask & (mask >> 7);
-		while mask != 0 {
-			let prev = mask;
-			mask &= mask - 1;
-			let top_left = prev - mask;
-			// Then we find the tile value associated
-			// for each tile.
-			yield self.tile_at(top_left)
-		}
+	fn filled_tiles(&self) -> impl Iterator<Item = u8> {
+		filled_tiles(&self.pieces_mask, &self.black_mask)
 	}
 
 	/**
-	 * Apply a move without checking for its validity.
+	 * Apply a move and check for validity.
 	 */
-	pub fn next(&self, mov: &Move) -> Board {
+	pub fn next(&self, mov: &Move) -> Option<Board> {
 		let pos = Board::position_mask(mov.x, mov.y);
-		Board {
+		Some(Board {
 			pieces_mask: self.pieces_mask | pos,
 			black_mask: if mov.color == Color::Black {
 				self.black_mask | pos
@@ -282,7 +277,12 @@ impl Board {
 			},
 			current_player: self.opponent,
 			opponent: self.current_player,
-		}
+			played_tiles: {
+				let tiles_from_move = self.tiles_from(mov)?;
+				let played_tiles = self.played_tiles.try_union(&tiles_from_move)?;
+				played_tiles
+			},
+		})
 	}
 
 	// TODO(perf): maybe a simpler way to implement this algorithm is to play
@@ -290,31 +290,22 @@ impl Board {
 	/**
 	 * A dup move is a move that generates two times the same tile, hence it is invalid.
 	 */
-	fn already_played_or_dup_move<'a>(
-		&'a self,
-		mov: &'a Move,
-		exhausted_tiles: &'a TileSet,
-	) -> bool {
-		let mut dup_list: [bool; 16] = [false; 16];
-		for tile in self.tiles_from(&mov) {
-			if exhausted_tiles.has(tile) {
-				return true;
-			}
-			if dup_list[tile as usize] {
-				return true;
-			}
-
-			dup_list[tile as usize] = true;
+	fn already_played_or_dup_move<'a>(&'a self, mov: &'a Move) -> bool {
+		let Some(tiles_from_move) = self.tiles_from(&mov) else {
+			return true; // dup move
+		};
+		match self.played_tiles.try_union(&tiles_from_move) {
+			Some(_) => false,
+			None => true, // already played
 		}
-		return false;
 	}
 
 	/**
 	 * From a empty square, checks which tiles could be created if we play
 	 * a given move. This function doesn't check for emptiness of the square.
 	 */
-	fn tiles_from<'a>(&self, mov: &'a Move) -> Vec<u8> {
-		let mut tiles = Vec::with_capacity(4);
+	fn tiles_from<'a>(&self, mov: &'a Move) -> Option<TileSet> {
+		let mut tiles = TileSet::new_unchecked(0);
 		let pos = Board::position_mask(mov.x, mov.y);
 		let mask_with_new_piece = self.pieces_mask | pos;
 
@@ -328,12 +319,12 @@ impl Board {
 					if mov.color == Color::Black {
 						tile |= 1 << -2 * dy << -dx;
 					}
-					tiles.push(tile);
+					tiles = tiles.try_add(tile)?;
 				}
 			}
 		}
 
-		tiles
+		Some(tiles)
 	}
 
 	/**
@@ -341,14 +332,7 @@ impl Board {
 	 * assumes that the tile is full of pieces.
 	 */
 	fn tile_at(&self, top_left: u64) -> u8 {
-		let top_left_shift = top_left.trailing_zeros();
-
-		let a = (self.black_mask & top_left) >> top_left_shift;
-		let b = (self.black_mask & (top_left << 1)) >> top_left_shift;
-		let c = (self.black_mask & (top_left << 7)) >> (top_left_shift + 5);
-		let d = (self.black_mask & (top_left << 8)) >> (top_left_shift + 5);
-
-		(a | b | c | d) as u8
+		tile_at(&self.black_mask, top_left)
 	}
 
 	fn position_mask(x: i8, y: i8) -> u64 {
@@ -427,8 +411,8 @@ impl Board {
 				if self.pieces_mask & position == 0 {
 					str.push_str("\x1b[30m");
 					match (
-						self.next(&Move::black(x, y)).is_invalid(),
-						self.next(&Move::white(x, y)).is_invalid(),
+						self.next(&Move::black(x, y)).is_none(),
+						self.next(&Move::white(x, y)).is_none(),
 					) {
 						(false, false) => str.push('·'),
 						(false, true) => str.push('b'),
@@ -449,6 +433,31 @@ impl Board {
 
 		str
 	}
+}
+
+gen fn filled_tiles<'a>(pieces_mask: &'a u64, black_mask: &'a u64) -> u8 {
+	// First, we retrieve every top-left corners of filled tiles
+	let mut mask = pieces_mask & (pieces_mask >> 1);
+	mask = mask & (mask >> 7);
+	while mask != 0 {
+		let prev = mask;
+		mask &= mask - 1;
+		let top_left = prev - mask;
+		// Then we find the tile value associated
+		// for each tile.
+		yield tile_at(black_mask, top_left)
+	}
+}
+
+fn tile_at(black_mask: &u64, top_left: u64) -> u8 {
+	let top_left_shift = top_left.trailing_zeros();
+
+	let a = (black_mask & top_left) >> top_left_shift;
+	let b = (black_mask & (top_left << 1)) >> top_left_shift;
+	let c = (black_mask & (top_left << 7)) >> (top_left_shift + 5);
+	let d = (black_mask & (top_left << 8)) >> (top_left_shift + 5);
+
+	(a | b | c | d) as u8
 }
 
 impl std::convert::TryFrom<&str> for Board {
@@ -473,6 +482,7 @@ impl std::fmt::Debug for Board {
 #[cfg(test)]
 mod tests {
 	use super::*;
+	use test::bench::Bencher;
 
 	macro_rules! assert_tile {
 		($board:expr, ($x:expr, $y:expr), $tile:expr) => {
@@ -532,7 +542,7 @@ mod tests {
 		let mov = Move::try_from("wd2").unwrap();
 		let board = Board::from_fen("2wwb/2w1b/2wbb/5/5 01234567").unwrap();
 		println!("{}\nChecking tiles from move {}", board, mov);
-		assert_eq!(board.tiles_from(&mov), vec![0, 10, 8, 14])
+		assert_eq!(board.tiles_from(&mov).unwrap(), vec![0, 10, 8, 14].into())
 	}
 
 	#[test]
@@ -567,5 +577,31 @@ mod tests {
 		assert_eq!(Board::from_fen(fen).unwrap().fen(), fen);
 		fen = "5/5/5/5/5 01234567";
 		assert_eq!(Board::from_fen(fen).unwrap().fen(), "//// 01234567");
+	}
+
+	#[bench]
+	fn bench_is_move_possible(b: &mut Bencher) {
+		for fen in vec![
+			"2b1b/wwb1w/w1bw/bw1w/bw2b 137abcdf",
+			"1bwwb/wwwwb/b/w2wb/2b1w 14579ace",
+			"bw/1ww/1bb1w//b1ww 0367abce",
+			"bb/wb1b/2w/4w/1w1bw 146789bf",
+			"/4b/4w/b2w/4b 35679acd",
+			"4b//b1b1b//3b 013578ab",
+			"//// 2456abcd",
+			"//// 456abcdf",
+		] {
+			let board = Board::from_fen(fen).unwrap();
+			b.iter(|| {
+				for x in 0..5 {
+					for y in 0..5 {
+						for color in [Color::Black, Color::White] {
+							let mov = Move::new(x, y, color);
+							let _ = board.is_move_possible(&mov);
+						}
+					}
+				}
+			});
+		}
 	}
 }

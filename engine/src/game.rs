@@ -51,7 +51,7 @@ impl Game {
 				}
 				Action::Move(mov) => {
 					prev.push(self.board.clone());
-					self.board = self.board.next(&mov);
+					self.board = self.board.next(&mov).unwrap();
 				}
 				Action::Quit => {
 					break;

@@ -1,4 +1,7 @@
 #![feature(gen_blocks)]
+#![feature(test)]
+
+extern crate test;
 
 pub(crate) mod board;
 pub(crate) mod color;

@@ -33,7 +33,7 @@ fn generate_line<R: Rng>(
 		let mov = possible_moves
 			.choose(rng)
 			.ok_or("There should be at least one possible move")?;
-		board = board.next(&mov);
+		board = board.next(&mov).unwrap();
 		if board.is_invalid() {
 			return Err("Generated an invalid board");
 		}

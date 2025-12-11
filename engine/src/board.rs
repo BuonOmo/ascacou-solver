@@ -194,7 +194,7 @@ impl Board {
 	}
 
 	pub fn is_move_possible(&self, mov: &Move) -> bool {
-		if Board::position_mask(mov.x, mov.y) & self.pieces_mask != 0 {
+		if mov.mask() & self.pieces_mask != 0 {
 			return false;
 		}
 		if self.already_played_or_dup_move(mov) {
@@ -227,25 +227,7 @@ impl Board {
 	// TODO: what is the best option: using `already_played_or_dup_move()`
 	// or `next().is_invalid()` ?
 	pub fn is_terminal(&self) -> bool {
-		for x in 0..5 {
-			for y in 0..5 {
-				// Already a piece there.
-				if Board::position_mask(x, y) & self.pieces_mask != 0 {
-					continue;
-				}
-
-				for color in [Color::Black, Color::White] {
-					let mov = Move::new(x, y, color);
-					if self.already_played_or_dup_move(&mov) {
-						continue;
-					}
-
-					return false;
-				}
-			}
-		}
-
-		true
+		self.played_tiles.full() || self.possible_moves().next().is_none()
 	}
 
 	pub fn is_winning(&self) -> bool {
@@ -267,10 +249,12 @@ impl Board {
 	 * Apply a move and check for validity.
 	 */
 	pub fn next(&self, mov: &Move) -> Option<Board> {
-		let pos = Board::position_mask(mov.x, mov.y);
+		let pos = mov.mask();
 		if pos & self.pieces_mask != 0 {
 			return None;
 		}
+		let tiles_from_move = self.tiles_from(mov)?;
+		let played_tiles = self.played_tiles.try_union(&tiles_from_move)?;
 		Some(Board {
 			pieces_mask: self.pieces_mask | pos,
 			black_mask: if mov.color == Color::Black {
@@ -280,11 +264,7 @@ impl Board {
 			},
 			current_player: self.opponent,
 			opponent: self.current_player,
-			played_tiles: {
-				let tiles_from_move = self.tiles_from(mov)?;
-				let played_tiles = self.played_tiles.try_union(&tiles_from_move)?;
-				played_tiles
-			},
+			played_tiles,
 		})
 	}
 
@@ -309,7 +289,7 @@ impl Board {
 	 */
 	fn tiles_from<'a>(&self, mov: &'a Move) -> Option<TileSet> {
 		let mut tiles = TileSet::new_unchecked(0);
-		let pos = Board::position_mask(mov.x, mov.y);
+		let pos = mov.mask();
 		// A new move impacts up to a 3x3 area.
 		// We can represent it with a number
 		// that we'll have to move exactly
@@ -324,8 +304,8 @@ impl Board {
 		// Hence 0b0000111_0000111_0000111 is
 		// the mask to move around.
 		let impacted_area = Board::shift_rows(
-			Board::shift_cols(0b0000111_0000111_0000111u64, mov.x),
-			mov.y,
+			Board::shift_cols(0b0000111_0000111_0000111u64, mov.x as i8),
+			mov.y as i8,
 		);
 		let new_mask = (self.pieces_mask | pos) & impacted_area;
 		let new_black_mask = if mov.color == Color::Black {
@@ -341,16 +321,11 @@ impl Board {
 		Some(tiles)
 	}
 
-	fn position_mask(x: i8, y: i8) -> u64 {
-		/* Masks are 7x7 rather than 5x5 to allow simpler bitboard
-		 * computation. This means that when we shift bits by N row
-		 * or column, they will fall in an unchecked area we don't
-		 * care about. Note that this was an implementation choice
-		 * beforehand, and it may be reduced to optimize storage.
-		 *
-		 * With that said, our first (x, y) should start at bit 8.
-		 */
-		Board::shift_rows(Board::shift_cols(256u64, x), y)
+	fn position_mask(x: u8, y: u8) -> u64 {
+		assert!(x < 5);
+		assert!(y < 5);
+		// Board::shift_rows(Board::shift_cols(256u64, x), y)
+		Move::mask_at(x, y)
 	}
 
 	fn shift_rows(mask: u64, num_rows: i8) -> u64 {
@@ -554,9 +529,10 @@ mod tests {
 			1u64 << 8,
 			"position (0, 0) is incorrect"
 		);
+		let expected = 1u64 << 9;
 		assert_eq!(
 			Board::position_mask(1, 0),
-			1u64 << 9,
+			expected,
 			"position (1, 0) is incorrect"
 		);
 		assert_eq!(

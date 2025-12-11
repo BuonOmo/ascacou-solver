@@ -27,14 +27,14 @@ impl TileSet {
 		if self.has(val) {
 			return None;
 		}
-		Some(TileSet::new(self.values | (1 << val)))
+		Some(TileSet::new_unchecked(self.values | (1 << val)))
 	}
 
 	pub const fn try_union(&self, other: &TileSet) -> Option<TileSet> {
 		if (self.values & other.values) != 0 {
 			return None;
 		}
-		Some(TileSet::new(self.values | other.values))
+		Some(TileSet::new_unchecked(self.values | other.values))
 	}
 
 	pub const fn most_present_color(&self) -> Color {
@@ -107,7 +107,6 @@ impl std::iter::FromIterator<u8> for TileSet {
 		for tile in iter {
 			values |= 1 << tile;
 		}
-		debug_assert!(values.count_ones() == 8);
 		TileSet { values }
 	}
 }

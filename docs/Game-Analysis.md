@@ -24,7 +24,7 @@ for _i in 0..total {
 	while !board.is_terminal() {
 		current_player = -current_player;
 		let mov = board.possible_moves().into_iter().choose(&mut rng).unwrap();
-		board = board.next(&mov);
+		board = board.next(&mov).expect("should play valid move");
 	}
 	let score = current_player * board.current_score();
 	durations += now.elapsed().as_nanos();
@@ -72,7 +72,7 @@ for _ in 0..iterations {
 	let mut current_moves = 0;
 	while !board.is_terminal() {
 		let mov = board.possible_moves().into_iter().choose(&mut rng).unwrap();
-		board = board.next(&mov);
+		board = board.next(&mov).expect("should play valid move");
 		current_moves += 1;
 	}
 	moves.push(current_moves.clone());

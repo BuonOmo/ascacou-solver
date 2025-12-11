@@ -89,20 +89,20 @@ impl Solver {
 			return (evaluation(board), None);
 		}
 
-		let moves = possible_moves(&board, false);
+		let boards_and_moves = next_boards_and_moves(&board, false);
 
 		let mut best_mov: Option<&Move> = None;
 		let mut terminal = true;
-		for mov in moves {
+		for (board, mov) in boards_and_moves {
 			terminal = false;
-			let score = -self.negamax(&board.next(&mov).unwrap(), -beta, -alpha, depth - 1);
+			let score = -self.negamax(&board, -beta, -alpha, depth - 1);
 			if score >= beta {
-				return (score, Some(&mov));
+				return (score, Some(&mov)); // TODO: handle the none stuff
 			}
 
 			if score > alpha {
 				alpha = score;
-				best_mov = Some(&mov);
+				best_mov = Some(&mov); // TODO: handle the best move stuff
 			}
 		}
 		if terminal {
@@ -138,11 +138,11 @@ impl Solver {
 			return evaluation(board);
 		}
 
-		let moves = possible_moves(&board, depth <= FORCED_MOVE_DEPTH);
+		let boards = next_boards(&board, depth <= FORCED_MOVE_DEPTH);
 
 		let mut terminal = true;
 
-		for mov in moves {
+		for board in boards {
 			terminal = false;
 			// TODO(perf): we could have the board being part of the solver as mutable, and
 			//  have a function to make a move and unmake a move. This way we would not
@@ -155,7 +155,7 @@ impl Solver {
 			//
 			//  a simple implementation of this idea only yields a quite small improvement (from 1.9ms to 1.7ms for a
 			//  full random game simulation)
-			let score = -self.negamax(&board.next(&mov).unwrap(), -beta, -alpha, depth - 1);
+			let score = -self.negamax(&board, -beta, -alpha, depth - 1);
 
 			if score >= beta {
 				return score;
@@ -175,37 +175,56 @@ impl Solver {
 	}
 }
 
-gen fn forced_moves(board: &Board) -> &'static Move {
-	let len = HEURISTIC_BLACK_FIRST.len() / 2;
-	for i in 0..HEURISTIC_BLACK_FIRST.len() / 2 {
-		let mov_black = &HEURISTIC_BLACK_FIRST[i];
-		let mov_white = &HEURISTIC_BLACK_FIRST[len + i];
-		let black_possible = board.is_move_possible(mov_black);
-		let white_possible = board.is_move_possible(mov_white);
-		if black_possible && !white_possible {
-			yield mov_black;
-		} else if white_possible && !black_possible {
-			yield mov_white;
+gen fn next_boards_and_moves(board: &Board, forced: bool) -> (Board, &'static Move) {
+	if forced {
+		let len = HEURISTIC_BLACK_FIRST.len() / 2;
+		for i in 0..HEURISTIC_BLACK_FIRST.len() / 2 {
+			let mov_black = &HEURISTIC_BLACK_FIRST[i];
+			let mov_white = &HEURISTIC_BLACK_FIRST[len + i];
+			match (board.next(mov_black), board.next(mov_white)) {
+				(Some(b), None) => yield (b, mov_black),
+				(None, Some(w)) => yield (w, mov_white),
+				_ => {}
+			}
+		}
+	} else {
+		let black_fav = board.current_player.favorite_color == ascacou::Color::Black;
+		let preferred_heuristic = if black_fav {
+			&HEURISTIC_BLACK_FIRST
+		} else {
+			&HEURISTIC_WHITE_FIRST
+		};
+		for mov in preferred_heuristic {
+			if let Some(next_board) = board.next(mov) {
+				yield (next_board, mov);
+			};
 		}
 	}
 }
 
-gen fn possible_moves(board: &Board, forced: bool) -> &'static Move {
+gen fn next_boards(board: &Board, forced: bool) -> Board {
 	if forced {
-		for mov in forced_moves(&board) {
-			yield mov;
+		let len = HEURISTIC_BLACK_FIRST.len() / 2;
+		for i in 0..HEURISTIC_BLACK_FIRST.len() / 2 {
+			let mov_black = &HEURISTIC_BLACK_FIRST[i];
+			let mov_white = &HEURISTIC_BLACK_FIRST[len + i];
+			match (board.next(mov_black), board.next(mov_white)) {
+				(Some(b), None) => yield b,
+				(None, Some(w)) => yield w,
+				_ => {}
+			}
 		}
-		return;
-	}
-	let black_fav = board.current_player.favorite_color == ascacou::Color::Black;
-	let preferred_heuristic = if black_fav {
-		&HEURISTIC_BLACK_FIRST
 	} else {
-		&HEURISTIC_WHITE_FIRST
-	};
-	for mov in preferred_heuristic {
-		if board.is_move_possible(mov) {
-			yield mov;
+		let black_fav = board.current_player.favorite_color == ascacou::Color::Black;
+		let preferred_heuristic = if black_fav {
+			&HEURISTIC_BLACK_FIRST
+		} else {
+			&HEURISTIC_WHITE_FIRST
+		};
+		for mov in preferred_heuristic {
+			if let Some(next_board) = board.next(mov) {
+				yield next_board;
+			};
 		}
 	}
 }
@@ -283,8 +302,14 @@ mod tests {
 			("bw2b/ww2b/bww1w/w1b/w1w1b 12346cdf", vec!["bb4"]),
 		] {
 			let board = Board::from_fen(fen).unwrap();
-			let forced: Vec<String> = forced_moves(&board).map(String::from).collect();
-			assert_eq!(forced, expected, "for board:\n{}", board.for_console());
+			let new_boards: Vec<String> = expected
+				.iter()
+				.filter_map(|s| Move::try_from(s.as_ref()).ok())
+				.filter_map(|m| board.next(&m))
+				.map(|b| b.fen())
+				.collect();
+			let forced: Vec<String> = next_boards(&board, true).map(|b| b.fen()).collect();
+			assert_eq!(forced, new_boards, "for board:\n{}", board.for_console());
 		}
 	}
 	#[test]

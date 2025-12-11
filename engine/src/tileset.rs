@@ -37,6 +37,10 @@ impl TileSet {
 		Some(TileSet::new_unchecked(self.values | other.values))
 	}
 
+	pub const fn full(&self) -> bool {
+		self.values == 0xFFFF
+	}
+
 	pub const fn most_present_color(&self) -> Color {
 		if self.count_blacks() >= 16 {
 			Color::Black

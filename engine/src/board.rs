@@ -148,7 +148,7 @@ impl Board {
 			black_mask,
 			current_player,
 			opponent,
-			played_tiles: TileSet::from_iter(filled_tiles(&black_mask, &white_mask)),
+			played_tiles: TileSet::from_iter(filled_tiles(&pieces_mask, &black_mask)),
 		})
 	}
 
@@ -268,6 +268,9 @@ impl Board {
 	 */
 	pub fn next(&self, mov: &Move) -> Option<Board> {
 		let pos = Board::position_mask(mov.x, mov.y);
+		if pos & self.pieces_mask != 0 {
+			return None;
+		}
 		Some(Board {
 			pieces_mask: self.pieces_mask | pos,
 			black_mask: if mov.color == Color::Black {
@@ -307,32 +310,35 @@ impl Board {
 	fn tiles_from<'a>(&self, mov: &'a Move) -> Option<TileSet> {
 		let mut tiles = TileSet::new_unchecked(0);
 		let pos = Board::position_mask(mov.x, mov.y);
-		let mask_with_new_piece = self.pieces_mask | pos;
+		// A new move impacts up to a 3x3 area.
+		// We can represent it with a number
+		// that we'll have to move exactly
+		// like a position.
+		//
+		//    0  1  2  3  4  5  6
+		//    7  8  9 10 11 12 13
+		//   14 15 16 ...
+		//
+		// From the above grid, we need to set
+		// bits  0, 1, 2, 7, 8, 9, 14, 15, 16.
+		// Hence 0b0000111_0000111_0000111 is
+		// the mask to move around.
+		let impacted_area = Board::shift_rows(
+			Board::shift_cols(0b0000111_0000111_0000111u64, mov.x),
+			mov.y,
+		);
+		let new_mask = (self.pieces_mask | pos) & impacted_area;
+		let new_black_mask = if mov.color == Color::Black {
+			self.black_mask | pos
+		} else {
+			self.black_mask
+		};
 
-		// TODO(refacto): consider using bottom right rather than top left to work only with unsigned?
-		for dy in [-1i8, 0] {
-			for dx in [-1i8, 0] {
-				let tile_mask = Board::tile_mask(mov.x + dx, mov.y + dy);
-				if tile_mask & mask_with_new_piece == tile_mask {
-					let mut tile = self.tile_at(Board::position_mask(mov.x + dx, mov.y + dy));
-					// We have to compute the missing value of our tile.
-					if mov.color == Color::Black {
-						tile |= 1 << -2 * dy << -dx;
-					}
-					tiles = tiles.try_add(tile)?;
-				}
-			}
+		for tile in filled_tiles(&new_mask, &new_black_mask) {
+			tiles = tiles.try_add(tile)?;
 		}
 
 		Some(tiles)
-	}
-
-	/**
-	 * Return the tile number at a given position. This method
-	 * assumes that the tile is full of pieces.
-	 */
-	fn tile_at(&self, top_left: u64) -> u8 {
-		tile_at(&self.black_mask, top_left)
 	}
 
 	fn position_mask(x: i8, y: i8) -> u64 {
@@ -345,24 +351,6 @@ impl Board {
 		 * With that said, our first (x, y) should start at bit 8.
 		 */
 		Board::shift_rows(Board::shift_cols(256u64, x), y)
-	}
-
-	fn tile_mask(x: i8, y: i8) -> u64 {
-		/* A tile has four bits on, hence
-		 * we can represent it with a number
-		 * that we'll have to move exactly
-		 * like a position.
-		 *
-		 *    0  1  2  3  4  5  6
-		 *    7  8  9 10 11 12 13
-		 *   14 15 16 ...
-		 *
-		 * From the above grid, bits 8, 9, 15 and 16
-		 * will correspond to a tile on the first
-		 * place of our grid. Hence 99072 is the
-		 * tile to move.
-		 */
-		Board::shift_rows(Board::shift_cols(99072u64, x), y)
 	}
 
 	fn shift_rows(mask: u64, num_rows: i8) -> u64 {
@@ -486,7 +474,7 @@ mod tests {
 
 	macro_rules! assert_tile {
 		($board:expr, ($x:expr, $y:expr), $tile:expr) => {
-			let result = $board.tile_at(Board::position_mask($x, $y));
+			let result = tile_at(&$board.black_mask, Board::position_mask($x, $y));
 			assert_eq!(
 				result, $tile,
 				"\nExpected: {:0>4b},\n     got: {:0>4b}",
@@ -496,7 +484,7 @@ mod tests {
 	}
 
 	#[test]
-	fn tile_at() {
+	fn test_tile_at() {
 		let mut board = Board::from_fen("bw/ww/5/5/5 01234567").unwrap();
 		assert_tile!(board, (0, 0), 0b0001);
 		board = Board::from_fen("bb/ww/5/5/5 01234567").unwrap();
@@ -511,6 +499,20 @@ mod tests {
 		assert_tile!(board, (2, 0), 0b1111);
 		assert_tile!(board, (2, 0), 0b1111);
 		assert_tile!(board, (0, 1), 0b1000);
+	}
+
+	#[test]
+	fn test_next() {
+		let board = Board::from_fen("bb1ww/www1w/1bbw/1bww/2w 2689abce").unwrap();
+		let mov = Move::try_from("bc1").unwrap();
+		assert!(board.next(&mov).is_none());
+	}
+
+	#[test]
+	fn test_from_fen_set_played_tiles() {
+		let board = Board::from_fen("bb1ww/www1w/1bbw/1bww/2w 2689abce").unwrap();
+		let expected_played_tiles: TileSet = TileSet::new_unchecked(0b0001_0000_1000_1010);
+		assert_eq!(board.played_tiles, expected_played_tiles);
 	}
 
 	#[test]

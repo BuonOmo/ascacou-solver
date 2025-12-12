@@ -1,4 +1,4 @@
-#!/usr/bin/env zsh
+#!/usr/bin/env bash
 #
 # Usage: ./tourney <commit>
 
@@ -74,7 +74,7 @@ score() {
 }
 
 play() {
-	$1 --timeout=1000 --depth=25 $2 | awk '/Move:/ {print $2}'
+	$1 --timeout=1000 --depth=25 "$2" | awk '/Move:/ {print $2}'
 }
 
 game() {
@@ -89,8 +89,8 @@ game() {
 	echo $(($(score "$board") * order))
 }
 
-for file in $data; do
-	setname=${file:t}
+for file in "${data[@]}"; do
+	setname=$(basename $file)
 	for order in -1 1; do
 		setscore=0
 		echo -n "Playing ${counts[$setname]} games from $setname set, ${names[$order]} plays first... "

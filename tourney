@@ -111,3 +111,6 @@ case $winner in
 0) echo "Draw: both versions may be the same..." ;;
 *) echo "${names[$winner]} wins!" ;;
 esac
+
+# Success means we improved.
+((winner > 0))

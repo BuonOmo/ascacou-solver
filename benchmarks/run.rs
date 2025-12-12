@@ -232,7 +232,15 @@ fn main() -> EmptyResult {
 				"Running {} solver for {file} set",
 				if partial { "partial" } else { "full" }
 			);
-			match run_group(file, max_depth, partial, 20_000) {
+			match run_group(
+				file,
+				max_depth,
+				partial,
+				std::env::args()
+					.nth(1)
+					.map(|s| s.parse().expect("could not parse max time"))
+					.unwrap_or(20_000),
+			) {
 				Ok((depth, avg_duration, avg_positions)) => [
 					file.to_string(),
 					format_depth(depth, max_depth, partial),

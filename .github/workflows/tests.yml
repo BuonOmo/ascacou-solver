@@ -1,22 +1,80 @@
-name: Rust
+name: Tests
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ['main']
   pull_request:
-    branches: [ "main" ]
+    branches: ['main']
 
 env:
   CARGO_TERM_COLOR: always
 
-jobs:
-  build:
+concurrency:
+  group: '${{ github.workflow }} @ ${{ github.ref }}'
+  cancel-in-progress: true
 
+jobs:
+  validate:
+    if: always()
+    needs: [tests, tourney, benchmark]
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
-    - name: Build
-      run: cargo build --verbose
-    - name: Run tests
-      run: cargo test --verbose
+      - name: Validate Pull Request
+        run: |
+          tests="${{ needs.tests.result }}"
+          benchmark="${{ needs.benchmark.result }}"
+          tourney="${{ needs.tourney.result }}"
+
+          [[ "$tests" == "success" ]] && [[ "$benchmark" == "success" ]] &&
+            [[ "$tourney" == "success" || "$tourney" == "skipped" ]] &&
+            exit 0
+          exit 1
+
+  tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup update nightly && rustup default nightly
+      - name: Build
+        run: cargo build --verbose
+      - name: Run tests
+        run: cargo test --verbose
+  benchmark:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup update nightly && rustup default nightly
+      - name: Build
+        run: cargo build --verbose
+      - name: Run benchmarks
+        run: cargo run --release --bin run -- 40000
+      - name: Show Result and Patch
+        run: |
+          echo "## Result" >> $GITHUB_STEP_SUMMARY
+          echo >> $GITHUB_STEP_SUMMARY
+          cat README.md | awk 'BEGIN{P=0} /AUTOMAGICALLY/{P=1-P;next} P{print}' >> $GITHUB_STEP_SUMMARY
+          echo
+          echo "## Patch" >> $GITHUB_STEP_SUMMARY
+          echo '```diff' >> $GITHUB_STEP_SUMMARY
+          git diff README.md >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+  tourney:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # We also want to fetch the main branch.
+      - run: rustup update nightly && rustup default nightly
+      - name: Play a tourney
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            opponent=$(git describe --tags --abbrev=0)
+          else
+            opponent='refs/remotes/origin/main'
+          fi
+          ./tourney $opponent | tee $GITHUB_STEP_SUMMARY

@@ -1,14 +1,34 @@
 use ascacou::{Board, Color::*, Move};
 
-pub struct Solver {
-	explored_positions: u128,
-	transposition_table: std::collections::HashMap<u64, EvaluationScore>,
+use crate::transposition_table::TranspositionTable;
+
+const fn parse_usize(s: &str) -> usize {
+	let mut bytes = s.as_bytes();
+	let mut result = 0;
+	while let [byte, rest @ ..] = bytes {
+		assert!(b'0' <= *byte && *byte <= b'9', "invalid digit");
+		result = result * 10 + (*byte - b'0') as usize;
+		bytes = rest;
+	}
+	result
 }
 
-pub use std::primitive::i16 as EvaluationScore;
+// A prime number close to 2^23 to have a good
+// distribution of entries in the transposition
+// table under 64mb of memory usage.
+const TRANSPOSITION_TABLE_SIZE: usize = parse_usize(env!("TRANSPOSITION_TABLE_SIZE"));
+// env!("TRANSPOSITION_TABLE_SIZE")
+// const TMP = 0x8FFFFFu32;
 
-const MIN_SCORE: EvaluationScore = -100;
-const MAX_SCORE: EvaluationScore = 100;
+pub struct Solver<const N: usize> {
+	explored_positions: u128,
+	transposition_table: TranspositionTable<N>, //std::collections::HashMap<u64, EvaluationScore>,
+}
+
+pub use std::primitive::i8 as EvaluationScore;
+
+const MIN_SCORE: EvaluationScore = -8;
+const MAX_SCORE: EvaluationScore = 8;
 
 /// Depth of forced moves search. These moves will
 /// be explored when depth is exhausted to make sure
@@ -68,11 +88,11 @@ const HEURISTIC_WHITE_FIRST: [Move; 50] = heuristic_moves!(white => black [
 	(0, 0) (0, 4) (4, 0) (4, 4)
 ]);
 
-impl Solver {
-	fn new() -> Solver {
+impl<const N: usize> Solver<N> {
+	fn new() -> Solver<N> {
 		Solver {
 			explored_positions: 0,
-			transposition_table: std::collections::HashMap::new(),
+			transposition_table: TranspositionTable::default(),
 		}
 	}
 
@@ -125,9 +145,9 @@ impl Solver {
 		let key = key(&board);
 
 		// Reduce window by finding a transposition with a lower beta.
-		if let Some(cached_beta) = self.transposition_table.get(&key) {
-			if beta > *cached_beta {
-				beta = *cached_beta;
+		if let Some(cached_beta) = self.transposition_table.get(key) {
+			if beta > cached_beta {
+				beta = cached_beta;
 				if alpha >= beta {
 					return beta;
 				}
@@ -362,32 +382,66 @@ fn evaluation(board: &Board) -> EvaluationScore {
 }
 
 pub fn solve(board: &Board, depth: Option<u8>) -> (EvaluationScore, Option<Move>, u128) {
-	let mut solver = Solver::new();
+	dbg!(env!("RUST_MIN_STACK"));
+	dbg!(env!("TRANSPOSITION_TABLE_SIZE"));
+	std::thread::scope(|s| {
+		s.spawn(move || {
+			let mut solver: Solver<{ TRANSPOSITION_TABLE_SIZE }> = Solver::new();
 
-	let move_count: usize = board.possible_moves().count();
-	let max_depth = (move_count + 1) / 2;
-	let depth = depth.unwrap_or(max_depth as u8).min(max_depth as u8);
+			let move_count: usize = board.possible_moves().count();
+			let max_depth = (move_count + 1) / 2;
+			let depth = depth.unwrap_or(max_depth as u8).min(max_depth as u8);
 
-	let (score, mov) = solver.negamax0(board, MIN_SCORE, MAX_SCORE, depth);
+			let (score, mov) = solver.negamax0(board, MIN_SCORE, MAX_SCORE, depth);
 
-	(score, mov, solver.explored_positions)
+			(score, mov, solver.explored_positions)
+		})
+		.join()
+	})
+	.expect("Solver thread panicked")
+	// std::thread::Builder::new()
+	// 	.stack_size(1024 * 1024 * 512)
+	// 	.spawn(move || {
+	// 		let mut solver = Solver::new();
+
+	// 		let move_count: usize = board.possible_moves().count();
+	// 		let max_depth = (move_count + 1) / 2;
+	// 		let depth = depth.unwrap_or(max_depth as u8).min(max_depth as u8);
+
+	// 		let (score, mov) = solver.negamax0(board, MIN_SCORE, MAX_SCORE, depth);
+
+	// 		(score, mov.cloned(), solver.explored_positions)
+	// 	})
+	// 	.expect("Could not spawn solver thread")
+	// 	.join()
+	// 	.expect("Solver thread panicked")
 }
 
 pub fn partial_solve(board: &Board, depth: Option<u8>) -> (EvaluationScore, Option<Move>, u128) {
-	let mut solver = Solver::new();
+	// dbg!(env!("RUST_MIN_STACK").parse::<usize>().unwrap());
+	dbg!(env!("TRANSPOSITION_TABLE_SIZE").parse::<usize>().unwrap() * 8);
+	dbg!(env!("TRANSPOSITION_TABLE_SIZE"));
+	dbg!(TRANSPOSITION_TABLE_SIZE);
+	std::thread::scope(|s| {
+		s.spawn(move || {
+			let mut solver: Solver<{ TRANSPOSITION_TABLE_SIZE }> = Solver::new();
 
-	let move_count: u8 = board.possible_moves().count() as u8;
-	// Adding FORCED_MOVE_DEPTH to the max depth to ensure we
-	// explore non-forcing moves up to the maximum if we can
-	// and only rely on forced moves if we cannot explore
-	// to full depth. Otherwise, we may end up not exploring
-	// some non-forced last moves.
-	let max_depth = (move_count + 1) / 2 + FORCED_MOVE_DEPTH;
-	let depth = depth.unwrap_or(max_depth as u8).min(max_depth as u8);
+			let move_count: u8 = board.possible_moves().count() as u8;
+			// Adding FORCED_MOVE_DEPTH to the max depth to ensure we
+			// explore non-forcing moves up to the maximum if we can
+			// and only rely on forced moves if we cannot explore
+			// to full depth. Otherwise, we may end up not exploring
+			// some non-forced last moves.
+			let max_depth = (move_count + 1) / 2 + FORCED_MOVE_DEPTH;
+			let depth = depth.unwrap_or(max_depth as u8).min(max_depth as u8);
 
-	let (score, mov) = solver.negamax0(board, -1, 1, depth);
+			let (score, mov) = solver.negamax0(board, -1, 1, depth);
 
-	(score, mov, solver.explored_positions)
+			(score, mov, solver.explored_positions)
+		})
+		.join()
+	})
+	.expect("Solver thread panicked")
 }
 
 #[cfg(test)]

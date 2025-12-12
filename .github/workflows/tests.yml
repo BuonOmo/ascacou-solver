@@ -50,7 +50,7 @@ jobs:
       - name: Build
         run: cargo build --verbose
       - name: Run benchmarks
-        run: cargo run --release --bin run -- 40000
+        run: cargo run --release --bin run -- 60000 # 1mn per benchmark suite
       - name: Show Result and Patch
         run: |
           echo "## Result" >> $GITHUB_STEP_SUMMARY

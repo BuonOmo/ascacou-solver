@@ -13,16 +13,9 @@ const fn parse_usize(s: &str) -> usize {
 	result
 }
 
-// A prime number close to 2^23 to have a good
-// distribution of entries in the transposition
-// table under 64mb of memory usage.
-const TRANSPOSITION_TABLE_SIZE: usize = parse_usize(env!("TRANSPOSITION_TABLE_SIZE"));
-// env!("TRANSPOSITION_TABLE_SIZE")
-// const TMP = 0x8FFFFFu32;
-
-pub struct Solver<const N: usize> {
+pub struct Solver {
 	explored_positions: u128,
-	transposition_table: TranspositionTable<N>, //std::collections::HashMap<u64, EvaluationScore>,
+	transposition_table: TranspositionTable,
 }
 
 pub use std::primitive::i8 as EvaluationScore;
@@ -88,11 +81,11 @@ const HEURISTIC_WHITE_FIRST: [Move; 50] = heuristic_moves!(white => black [
 	(0, 0) (0, 4) (4, 0) (4, 4)
 ]);
 
-impl<const N: usize> Solver<N> {
-	fn new() -> Solver<N> {
+impl Solver {
+	fn new(transposition_table: TranspositionTable) -> Solver {
 		Solver {
 			explored_positions: 0,
-			transposition_table: TranspositionTable::default(),
+			transposition_table,
 		}
 	}
 
@@ -382,66 +375,37 @@ fn evaluation(board: &Board) -> EvaluationScore {
 }
 
 pub fn solve(board: &Board, depth: Option<u8>) -> (EvaluationScore, Option<Move>, u128) {
-	dbg!(env!("RUST_MIN_STACK"));
-	dbg!(env!("TRANSPOSITION_TABLE_SIZE"));
-	std::thread::scope(|s| {
-		s.spawn(move || {
-			let mut solver: Solver<{ TRANSPOSITION_TABLE_SIZE }> = Solver::new();
+	let mut solver: Solver = Solver::new(TranspositionTable::new(8_388_593));
 
-			let move_count: usize = board.possible_moves().count();
-			let max_depth = (move_count + 1) / 2;
-			let depth = depth.unwrap_or(max_depth as u8).min(max_depth as u8);
+	let move_count: usize = board.possible_moves().count();
+	// Adding FORCED_MOVE_DEPTH to the max depth to ensure we
+	// explore non-forcing moves up to the maximum if we can
+	// and only rely on forced moves if we cannot explore
+	// to full depth. Otherwise, we may end up not exploring
+	// some non-forced last moves.
+	let max_depth = (move_count + 1) / 2;
+	let depth = depth.unwrap_or(max_depth as u8).min(max_depth as u8);
 
-			let (score, mov) = solver.negamax0(board, MIN_SCORE, MAX_SCORE, depth);
+	let (score, mov) = solver.negamax0(board, MIN_SCORE, MAX_SCORE, depth);
 
-			(score, mov, solver.explored_positions)
-		})
-		.join()
-	})
-	.expect("Solver thread panicked")
-	// std::thread::Builder::new()
-	// 	.stack_size(1024 * 1024 * 512)
-	// 	.spawn(move || {
-	// 		let mut solver = Solver::new();
-
-	// 		let move_count: usize = board.possible_moves().count();
-	// 		let max_depth = (move_count + 1) / 2;
-	// 		let depth = depth.unwrap_or(max_depth as u8).min(max_depth as u8);
-
-	// 		let (score, mov) = solver.negamax0(board, MIN_SCORE, MAX_SCORE, depth);
-
-	// 		(score, mov.cloned(), solver.explored_positions)
-	// 	})
-	// 	.expect("Could not spawn solver thread")
-	// 	.join()
-	// 	.expect("Solver thread panicked")
+	(score, mov, solver.explored_positions)
 }
 
 pub fn partial_solve(board: &Board, depth: Option<u8>) -> (EvaluationScore, Option<Move>, u128) {
-	// dbg!(env!("RUST_MIN_STACK").parse::<usize>().unwrap());
-	dbg!(env!("TRANSPOSITION_TABLE_SIZE").parse::<usize>().unwrap() * 8);
-	dbg!(env!("TRANSPOSITION_TABLE_SIZE"));
-	dbg!(TRANSPOSITION_TABLE_SIZE);
-	std::thread::scope(|s| {
-		s.spawn(move || {
-			let mut solver: Solver<{ TRANSPOSITION_TABLE_SIZE }> = Solver::new();
+	let mut solver: Solver = Solver::new(TranspositionTable::new(8_388_593));
 
-			let move_count: u8 = board.possible_moves().count() as u8;
-			// Adding FORCED_MOVE_DEPTH to the max depth to ensure we
-			// explore non-forcing moves up to the maximum if we can
-			// and only rely on forced moves if we cannot explore
-			// to full depth. Otherwise, we may end up not exploring
-			// some non-forced last moves.
-			let max_depth = (move_count + 1) / 2 + FORCED_MOVE_DEPTH;
-			let depth = depth.unwrap_or(max_depth as u8).min(max_depth as u8);
+	let move_count: u8 = board.possible_moves().count() as u8;
+	// Adding FORCED_MOVE_DEPTH to the max depth to ensure we
+	// explore non-forcing moves up to the maximum if we can
+	// and only rely on forced moves if we cannot explore
+	// to full depth. Otherwise, we may end up not exploring
+	// some non-forced last moves.
+	let max_depth = (move_count + 1) / 2 + FORCED_MOVE_DEPTH;
+	let depth = depth.unwrap_or(max_depth as u8).min(max_depth as u8);
 
-			let (score, mov) = solver.negamax0(board, -1, 1, depth);
+	let (score, mov) = solver.negamax0(board, -1, 1, depth);
 
-			(score, mov, solver.explored_positions)
-		})
-		.join()
-	})
-	.expect("Solver thread panicked")
+	(score, mov, solver.explored_positions)
 }
 
 #[cfg(test)]

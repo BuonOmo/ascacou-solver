@@ -1,5 +1,6 @@
-pub struct TranspositionTable<const S: usize> {
-	table: [Entry; S],
+pub struct TranspositionTable {
+	table: Vec<Entry>,
+	size: usize,
 }
 
 // 1 byte!
@@ -30,17 +31,16 @@ impl Default for Entry {
 	}
 }
 
-impl<const S: usize> Default for TranspositionTable<S> {
-	fn default() -> Self {
+impl TranspositionTable {
+	pub fn new(size: usize) -> Self {
 		TranspositionTable {
-			table: [Entry::default(); S],
+			table: vec![Entry::default(); size],
+			size,
 		}
 	}
-}
 
-impl<const S: usize> TranspositionTable<S> {
 	fn index(&self, key: u64) -> usize {
-		(key as usize) % S
+		(key as usize) % self.size
 	}
 
 	pub fn get(&self, key: u64) -> Option<i8> {

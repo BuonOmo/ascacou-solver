@@ -2,7 +2,7 @@
 #
 # Usage: ./tourney <commit>
 
-set -e
+set -ex
 
 (($# == 1)) || {
 	echo "Usage: $0 <commit>"

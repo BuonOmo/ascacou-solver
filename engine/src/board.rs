@@ -13,7 +13,7 @@ pub struct Board {
 	pub black_mask: u64,
 	pub current_player: Player,
 	opponent: Player,
-	// pub possible_moves: &'a Vec<u8>
+	pub played_tiles: TileSet,
 }
 
 impl Board {
@@ -24,6 +24,7 @@ impl Board {
 			black_mask: 0,
 			current_player,
 			opponent,
+			played_tiles: TileSet::new_unchecked(0),
 		}
 	}
 
@@ -34,6 +35,7 @@ impl Board {
 			black_mask: 0,
 			current_player,
 			opponent,
+			played_tiles: TileSet::new_unchecked(0),
 		}
 	}
 
@@ -138,12 +140,14 @@ impl Board {
 		}
 
 		let (current_player, opponent) = Player::from_current_tiles(tiles);
+		let pieces_mask = black_mask | white_mask;
 
 		Ok(Board {
-			pieces_mask: (black_mask | white_mask),
+			pieces_mask,
 			black_mask,
 			current_player,
 			opponent,
+			played_tiles: TileSet::from_iter(filled_tiles(pieces_mask, black_mask)),
 		})
 	}
 
@@ -189,10 +193,10 @@ impl Board {
 	}
 
 	pub fn is_move_possible(&self, mov: &Move) -> bool {
-		if Board::position_mask(mov.x, mov.y) & self.pieces_mask != 0 {
+		if mov.mask() & self.pieces_mask != 0 {
 			return false;
 		}
-		if self.next(mov).is_invalid() {
+		if self.already_played_or_dup_move(mov) {
 			return false;
 		}
 		true
@@ -220,27 +224,7 @@ impl Board {
 	}
 
 	pub fn is_terminal(&self) -> bool {
-		let tiles = &TileSet::from_iter(self.filled_tiles());
-
-		for x in 0..5 {
-			for y in 0..5 {
-				// Already a piece there.
-				if Board::position_mask(x, y) & self.pieces_mask != 0 {
-					continue;
-				}
-
-				for color in [Color::Black, Color::White] {
-					let mov = Move::new(x, y, color);
-					if self.already_played_or_dup_move(&mov, tiles) {
-						continue;
-					}
-
-					return false;
-				}
-			}
-		}
-
-		true
+		self.played_tiles.full() || self.possible_moves().next().is_none()
 	}
 
 	pub fn is_winning(&self) -> bool {
@@ -253,27 +237,23 @@ impl Board {
 	 * is o(n), it is still quite computation heavy since
 	 * we have to call `tile_at()` for each filled tile.
 	 * Hence cost is roughly: 2 + 6 * n operations.
+	 * TODO: update comment.
 	 */
-	gen fn filled_tiles(&self) -> u8 {
-		// First, we retrieve every top-left corners of filled tiles
-		let mut mask = self.pieces_mask & (self.pieces_mask >> 1);
-		mask = mask & (mask >> 7);
-		while mask != 0 {
-			let prev = mask;
-			mask &= mask - 1;
-			let top_left = prev - mask;
-			// Then we find the tile value associated
-			// for each tile.
-			yield self.tile_at(top_left)
-		}
+	fn filled_tiles(&self) -> FilledTilesIterator {
+		filled_tiles(self.pieces_mask, self.black_mask)
 	}
 
 	/**
-	 * Apply a move without checking for its validity.
+	 * Apply a move and check for validity.
 	 */
-	pub fn next(&self, mov: &Move) -> Board {
-		let pos = Board::position_mask(mov.x, mov.y);
-		Board {
+	pub fn next(&self, mov: &Move) -> Option<Board> {
+		let pos = mov.mask();
+		if pos & self.pieces_mask != 0 {
+			return None;
+		}
+		let tiles_from_move = self.tiles_from(mov)?;
+		let played_tiles = self.played_tiles.try_union(&tiles_from_move)?;
+		Some(Board {
 			pieces_mask: self.pieces_mask | pos,
 			black_mask: if mov.color == Color::Black {
 				self.black_mask | pos
@@ -282,7 +262,8 @@ impl Board {
 			},
 			current_player: self.opponent,
 			opponent: self.current_player,
-		}
+			played_tiles,
+		})
 	}
 
 	// TODO(perf): maybe a simpler way to implement this algorithm is to play
@@ -290,95 +271,59 @@ impl Board {
 	/**
 	 * A dup move is a move that generates two times the same tile, hence it is invalid.
 	 */
-	fn already_played_or_dup_move<'a>(
-		&'a self,
-		mov: &'a Move,
-		exhausted_tiles: &'a TileSet,
-	) -> bool {
-		let mut dup_list: [bool; 16] = [false; 16];
-		for tile in self.tiles_from(&mov) {
-			if exhausted_tiles.has(tile) {
-				return true;
-			}
-			if dup_list[tile as usize] {
-				return true;
-			}
-
-			dup_list[tile as usize] = true;
+	fn already_played_or_dup_move<'a>(&'a self, mov: &'a Move) -> bool {
+		let Some(tiles_from_move) = self.tiles_from(&mov) else {
+			return true; // dup move
+		};
+		match self.played_tiles.try_union(&tiles_from_move) {
+			Some(_) => false,
+			None => true, // already played
 		}
-		return false;
 	}
 
 	/**
 	 * From a empty square, checks which tiles could be created if we play
 	 * a given move. This function doesn't check for emptiness of the square.
 	 */
-	fn tiles_from<'a>(&self, mov: &'a Move) -> Vec<u8> {
-		let mut tiles = Vec::with_capacity(4);
-		let pos = Board::position_mask(mov.x, mov.y);
-		let mask_with_new_piece = self.pieces_mask | pos;
+	fn tiles_from<'a>(&self, mov: &'a Move) -> Option<TileSet> {
+		let mut tiles = TileSet::new_unchecked(0);
+		let pos = mov.mask();
+		// A new move impacts up to a 3x3 area.
+		// We can represent it with a number
+		// that we'll have to move exactly
+		// like a position.
+		//
+		//    0  1  2  3  4  5  6
+		//    7  8  9 10 11 12 13
+		//   14 15 16 ...
+		//
+		// From the above grid, we need to set
+		// bits  0, 1, 2, 7, 8, 9, 14, 15, 16.
+		// Hence 0b0000111_0000111_0000111 is
+		// the mask to move around.
+		let impacted_area = Board::shift_rows(
+			Board::shift_cols(0b0000111_0000111_0000111u64, mov.x as i8),
+			mov.y as i8,
+		);
+		let new_mask = (self.pieces_mask | pos) & impacted_area;
+		let new_black_mask = if mov.color == Color::Black {
+			self.black_mask | pos
+		} else {
+			self.black_mask
+		};
 
-		// TODO(refacto): consider using bottom right rather than top left to work only with unsigned?
-		for dy in [-1i8, 0] {
-			for dx in [-1i8, 0] {
-				let tile_mask = Board::tile_mask(mov.x + dx, mov.y + dy);
-				if tile_mask & mask_with_new_piece == tile_mask {
-					let mut tile = self.tile_at(Board::position_mask(mov.x + dx, mov.y + dy));
-					// We have to compute the missing value of our tile.
-					if mov.color == Color::Black {
-						tile |= 1 << -2 * dy << -dx;
-					}
-					tiles.push(tile);
-				}
-			}
+		for tile in filled_tiles(new_mask, new_black_mask) {
+			tiles = tiles.try_add(tile)?;
 		}
 
-		tiles
+		Some(tiles)
 	}
 
-	/**
-	 * Return the tile number at a given position. This method
-	 * assumes that the tile is full of pieces.
-	 */
-	fn tile_at(&self, top_left: u64) -> u8 {
-		let top_left_shift = top_left.trailing_zeros();
-
-		let a = (self.black_mask & top_left) >> top_left_shift;
-		let b = (self.black_mask & (top_left << 1)) >> top_left_shift;
-		let c = (self.black_mask & (top_left << 7)) >> (top_left_shift + 5);
-		let d = (self.black_mask & (top_left << 8)) >> (top_left_shift + 5);
-
-		(a | b | c | d) as u8
-	}
-
-	fn position_mask(x: i8, y: i8) -> u64 {
-		/* Masks are 7x7 rather than 5x5 to allow simpler bitboard
-		 * computation. This means that when we shift bits by N row
-		 * or column, they will fall in an unchecked area we don't
-		 * care about. Note that this was an implementation choice
-		 * beforehand, and it may be reduced to optimize storage.
-		 *
-		 * With that said, our first (x, y) should start at bit 8.
-		 */
-		Board::shift_rows(Board::shift_cols(256u64, x), y)
-	}
-
-	fn tile_mask(x: i8, y: i8) -> u64 {
-		/* A tile has four bits on, hence
-		 * we can represent it with a number
-		 * that we'll have to move exactly
-		 * like a position.
-		 *
-		 *    0  1  2  3  4  5  6
-		 *    7  8  9 10 11 12 13
-		 *   14 15 16 ...
-		 *
-		 * From the above grid, bits 8, 9, 15 and 16
-		 * will correspond to a tile on the first
-		 * place of our grid. Hence 99072 is the
-		 * tile to move.
-		 */
-		Board::shift_rows(Board::shift_cols(99072u64, x), y)
+	fn position_mask(x: u8, y: u8) -> u64 {
+		assert!(x < 5);
+		assert!(y < 5);
+		// Board::shift_rows(Board::shift_cols(256u64, x), y)
+		Move::mask_at(x, y)
 	}
 
 	fn shift_rows(mask: u64, num_rows: i8) -> u64 {
@@ -427,8 +372,8 @@ impl Board {
 				if self.pieces_mask & position == 0 {
 					str.push_str("\x1b[30m");
 					match (
-						self.next(&Move::black(x, y)).is_invalid(),
-						self.next(&Move::white(x, y)).is_invalid(),
+						self.next(&Move::black(x, y)).is_none(),
+						self.next(&Move::white(x, y)).is_none(),
 					) {
 						(false, false) => str.push('·'),
 						(false, true) => str.push('b'),
@@ -449,6 +394,47 @@ impl Board {
 
 		str
 	}
+}
+
+fn filled_tiles(pieces_mask: u64, black_mask: u64) -> FilledTilesIterator {
+	let mut mask = pieces_mask;
+	// 1 1 & 1 0 = 1 0
+	// 1 1   1 0   1 0
+	mask = mask & (mask >> 1);
+	// 1 0 & 1 0 = 1 0
+	// 1 0   0 0   0 0
+	mask = mask & (mask >> 7);
+	FilledTilesIterator { mask, black_mask }
+}
+
+struct FilledTilesIterator {
+	mask: u64,
+	black_mask: u64,
+}
+
+impl Iterator for FilledTilesIterator {
+	type Item = u8;
+
+	fn next(&mut self) -> Option<Self::Item> {
+		if self.mask == 0 {
+			return None;
+		}
+		let prev = self.mask;
+		self.mask &= self.mask - 1;
+		let top_left = prev - self.mask;
+		Some(tile_at(&self.black_mask, top_left))
+	}
+}
+
+fn tile_at(black_mask: &u64, top_left: u64) -> u8 {
+	let top_left_shift = top_left.trailing_zeros();
+
+	let a = (black_mask & top_left) >> top_left_shift;
+	let b = (black_mask & (top_left << 1)) >> top_left_shift;
+	let c = (black_mask & (top_left << 7)) >> (top_left_shift + 5);
+	let d = (black_mask & (top_left << 8)) >> (top_left_shift + 5);
+
+	(a | b | c | d) as u8
 }
 
 impl std::convert::TryFrom<&str> for Board {
@@ -473,10 +459,11 @@ impl std::fmt::Debug for Board {
 #[cfg(test)]
 mod tests {
 	use super::*;
+	use test::bench::Bencher;
 
 	macro_rules! assert_tile {
 		($board:expr, ($x:expr, $y:expr), $tile:expr) => {
-			let result = $board.tile_at(Board::position_mask($x, $y));
+			let result = tile_at(&$board.black_mask, Board::position_mask($x, $y));
 			assert_eq!(
 				result, $tile,
 				"\nExpected: {:0>4b},\n     got: {:0>4b}",
@@ -486,7 +473,7 @@ mod tests {
 	}
 
 	#[test]
-	fn tile_at() {
+	fn test_tile_at() {
 		let mut board = Board::from_fen("bw/ww/5/5/5 01234567").unwrap();
 		assert_tile!(board, (0, 0), 0b0001);
 		board = Board::from_fen("bb/ww/5/5/5 01234567").unwrap();
@@ -501,6 +488,20 @@ mod tests {
 		assert_tile!(board, (2, 0), 0b1111);
 		assert_tile!(board, (2, 0), 0b1111);
 		assert_tile!(board, (0, 1), 0b1000);
+	}
+
+	#[test]
+	fn test_next() {
+		let board = Board::from_fen("bb1ww/www1w/1bbw/1bww/2w 2689abce").unwrap();
+		let mov = Move::try_from("bc1").unwrap();
+		assert!(board.next(&mov).is_none());
+	}
+
+	#[test]
+	fn test_from_fen_set_played_tiles() {
+		let board = Board::from_fen("bb1ww/www1w/1bbw/1bww/2w 2689abce").unwrap();
+		let expected_played_tiles: TileSet = TileSet::new_unchecked(0b0001_0000_1000_1010);
+		assert_eq!(board.played_tiles, expected_played_tiles);
 	}
 
 	#[test]
@@ -532,7 +533,7 @@ mod tests {
 		let mov = Move::try_from("wd2").unwrap();
 		let board = Board::from_fen("2wwb/2w1b/2wbb/5/5 01234567").unwrap();
 		println!("{}\nChecking tiles from move {}", board, mov);
-		assert_eq!(board.tiles_from(&mov), vec![0, 10, 8, 14])
+		assert_eq!(board.tiles_from(&mov).unwrap(), vec![0, 10, 8, 14].into())
 	}
 
 	#[test]
@@ -542,9 +543,10 @@ mod tests {
 			1u64 << 8,
 			"position (0, 0) is incorrect"
 		);
+		let expected = 1u64 << 9;
 		assert_eq!(
 			Board::position_mask(1, 0),
-			1u64 << 9,
+			expected,
 			"position (1, 0) is incorrect"
 		);
 		assert_eq!(
@@ -567,5 +569,31 @@ mod tests {
 		assert_eq!(Board::from_fen(fen).unwrap().fen(), fen);
 		fen = "5/5/5/5/5 01234567";
 		assert_eq!(Board::from_fen(fen).unwrap().fen(), "//// 01234567");
+	}
+
+	#[bench]
+	fn bench_is_move_possible(b: &mut Bencher) {
+		for fen in vec![
+			"2b1b/wwb1w/w1bw/bw1w/bw2b 137abcdf",
+			"1bwwb/wwwwb/b/w2wb/2b1w 14579ace",
+			"bw/1ww/1bb1w//b1ww 0367abce",
+			"bb/wb1b/2w/4w/1w1bw 146789bf",
+			"/4b/4w/b2w/4b 35679acd",
+			"4b//b1b1b//3b 013578ab",
+			"//// 2456abcd",
+			"//// 456abcdf",
+		] {
+			let board = Board::from_fen(fen).unwrap();
+			b.iter(|| {
+				for x in 0..5 {
+					for y in 0..5 {
+						for color in [Color::Black, Color::White] {
+							let mov = Move::new(x, y, color);
+							let _ = board.is_move_possible(&mov);
+						}
+					}
+				}
+			});
+		}
 	}
 }

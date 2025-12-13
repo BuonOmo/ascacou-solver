@@ -2,24 +2,73 @@ use crate::color::Color;
 
 #[derive(PartialEq, Eq, Clone, Copy, Debug)]
 pub struct Move {
-	// We use signed numbers to be able to
-	// have -1 as a move when doing bit ops
-	// since the bitboard is 7x7.
-	pub x: i8,
-	pub y: i8,
+	/// The column of the move (a, b, c, d, e).
+	/// It must be in the 0..5 range, and is
+	/// checked on debug builds.
+	pub x: u8,
+	/// The row of the move (1, 2, 3, 4, 5).
+	/// It must be in the 0..5 range, and is
+	/// checked on debug builds.
+	pub y: u8,
 	pub color: Color,
 }
 
+/// Masks are 7x7 rather than 5x5 to allow simpler bitboard
+/// computation. This means that when we shift bits by N row
+/// or column, they will fall in an unchecked area we don't
+/// care about. Note that this was an implementation choice
+/// beforehand, and it may be reduced to optimize storage.
+///
+/// With that said, our first (x, y) should start at bit
+/// 8 = 7 + 1. And each next row should start at bit 1 + (n-1) * 7.
+const POSITION_ON_MASK: [[u64; 5]; 5] = [
+	[
+		0b00001_0_0000000,
+		0b00010_0_0000000,
+		0b00100_0_0000000,
+		0b01000_0_0000000,
+		0b10000_0_0000000,
+	],
+	[
+		0b00001_0_0000000_0000000,
+		0b00010_0_0000000_0000000,
+		0b00100_0_0000000_0000000,
+		0b01000_0_0000000_0000000,
+		0b10000_0_0000000_0000000,
+	],
+	[
+		0b00001_0_0000000_0000000_0000000,
+		0b00010_0_0000000_0000000_0000000,
+		0b00100_0_0000000_0000000_0000000,
+		0b01000_0_0000000_0000000_0000000,
+		0b10000_0_0000000_0000000_0000000,
+	],
+	[
+		0b00001_0_0000000_0000000_0000000_0000000,
+		0b00010_0_0000000_0000000_0000000_0000000,
+		0b00100_0_0000000_0000000_0000000_0000000,
+		0b01000_0_0000000_0000000_0000000_0000000,
+		0b10000_0_0000000_0000000_0000000_0000000,
+	],
+	[
+		0b00001_0_0000000_0000000_0000000_0000000_0000000,
+		0b00010_0_0000000_0000000_0000000_0000000_0000000,
+		0b00100_0_0000000_0000000_0000000_0000000_0000000,
+		0b01000_0_0000000_0000000_0000000_0000000_0000000,
+		0b10000_0_0000000_0000000_0000000_0000000_0000000,
+	],
+];
+
 impl Move {
-	pub const fn new(x: i8, y: i8, color: Color) -> Move {
+	pub const fn new(x: u8, y: u8, color: Color) -> Move {
 		Move { x, y, color }
 	}
 
-	pub const fn black(x: i8, y: i8) -> Move {
+	pub const fn black(x: u8, y: u8) -> Move {
 		Move::new(x, y, Color::Black)
 	}
 
-	pub const fn white(x: i8, y: i8) -> Move {
+	pub const fn white(x: u8, y: u8) -> Move {
 		Move::new(x, y, Color::White)
 	}
 
@@ -29,6 +78,14 @@ impl Move {
 
 	pub fn is_white(&self) -> bool {
 		self.color == Color::White
+	}
+
+	pub const fn mask(&self) -> u64 {
+		Self::mask_at(self.x, self.y)
+	}
+
+	pub const fn mask_at(x: u8, y: u8) -> u64 {
+		POSITION_ON_MASK[y as usize][x as usize]
 	}
 }
 

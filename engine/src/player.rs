@@ -26,24 +26,13 @@ impl Player {
 	}
 
 	/**
-	 * Given a valid list of tiles (8 different tiles, unchecked there)
+	 * Given a valid list of tiles (8 different tiles, unchecked here)
 	 * return two players: the first one is the current player, the
 	 * second one is its opponent.
 	 */
 	pub fn from_current_tiles(tiles: [u8; 8]) -> (Player, Player) {
-		let ts1 = TileSet::from(tiles);
-
-		let mut opponent_tiles = [0; 8];
-		let mut i = 0;
-		for tile in 0..16 {
-			if ts1.has(tile) {
-				continue;
-			}
-
-			opponent_tiles[i] = tile;
-			i += 1;
-		}
-		(Player::new(ts1), Player::new(opponent_tiles))
+		let tileset = TileSet::from(tiles);
+		(Player::new(tileset), Player::new(!tileset))
 	}
 
 	fn new(tiles: impl Into<TileSet>) -> Player {

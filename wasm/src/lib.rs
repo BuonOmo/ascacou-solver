@@ -14,24 +14,20 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 pub fn solve(fen: &str, depth: u8) -> Result<String, String> {
 	let board = Board::from_fen(fen)?;
 
-	let (_, mov_opt, _) = minicou::solve(&board, Some(depth));
-
-	let Some(mov) = mov_opt else {
-		return Err("No solution found".to_string());
-	};
-	Ok(mov.into())
+	match minicou::solve(&board, Some(depth)) {
+		(_, Some(mov), _) => Ok(mov.into()),
+		_ => Err("No solution found".to_string()),
+	}
 }
 
 #[wasm_bindgen]
 pub fn play(fen: &str, #[wasm_bindgen(js_name = "move")] mov: &str) -> Result<String, String> {
 	let board = Board::from_fen(fen)?;
 	let mov = Move::try_from(mov.to_string())?;
-	let next = board.next(&mov);
-	if next.is_invalid() {
-		return Err("Invalid move".to_string());
+	match board.next(&mov) {
+		Some(next) => Ok(next.fen()),
+		None => Err("Invalid move".to_string()),
 	}
-
-	Ok(next.fen())
 }
 
 #[wasm_bindgen]

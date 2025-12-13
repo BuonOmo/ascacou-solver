@@ -34,7 +34,15 @@ impl Board {
 
 	fn next(&self, mov: String) -> PyResult<Self> {
 		match ascacou_rs::Move::try_from(mov) {
-			Ok(mov) => Ok(Board(self.0.next(&mov))),
+			Ok(mov) => self
+				.0
+				.next(&mov)
+				.map(|board| Board(board))
+				.ok_or(PyRuntimeError::new_err(format!(
+					"Invalid move '{}' for board '{}'",
+					mov,
+					self.0.fen()
+				))),
 			Err(s) => Err(PyRuntimeError::new_err(s)),
 		}
 	}

@@ -20,7 +20,7 @@ fn main() {
 				.nth(2)
 				.and_then(|str| Move::try_from(str).ok())
 				.unwrap();
-			println!("{}", board.next(&mov));
+			println!("{}", board.next(&mov).expect("should play valid move"));
 		}
 		_ => panic!("nop"),
 	}

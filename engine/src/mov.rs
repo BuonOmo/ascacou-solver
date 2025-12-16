@@ -60,6 +60,23 @@ const POSITION_ON_MASK: [[u64; 5]; 5] = [
 ];
 
 impl Move {
+	pub const fn from_position(pos: u64) -> (Move, Move) {
+		let zeros = pos.trailing_zeros() - 7;
+		let x = ((zeros - 1) % 7) as u8;
+		let y = (zeros / 7) as u8;
+		(
+			Move {
+				x,
+				y,
+				color: Color::Black,
+			},
+			Move {
+				x,
+				y,
+				color: Color::White,
+			},
+		)
+	}
 	pub const fn new(x: u8, y: u8, color: Color) -> Move {
 		Move { x, y, color }
 	}
@@ -86,6 +103,21 @@ impl Move {
 
 	pub const fn mask_at(x: u8, y: u8) -> u64 {
 		POSITION_ON_MASK[y as usize][x as usize]
+	}
+}
+
+impl std::ops::Not for Move {
+	type Output = Move;
+
+	fn not(self) -> Move {
+		Move {
+			x: self.x,
+			y: self.y,
+			color: match self.color {
+				Color::Black => Color::White,
+				Color::White => Color::Black,
+			},
+		}
 	}
 }
 
@@ -204,5 +236,30 @@ mod tests {
 				y: 0
 			})
 		)
+	}
+
+	#[test]
+	fn test_from_position() {
+		POSITION_ON_MASK.iter().enumerate().for_each(|(y, row)| {
+			row.iter().enumerate().for_each(|(x, &mask)| {
+				let (mov_black, mov_white) = Move::from_position(mask);
+				assert_eq!(
+					mov_black,
+					Move {
+						x: x as u8,
+						y: y as u8,
+						color: Color::Black
+					}
+				);
+				assert_eq!(
+					mov_white,
+					Move {
+						x: x as u8,
+						y: y as u8,
+						color: Color::White
+					}
+				);
+			});
+		});
 	}
 }

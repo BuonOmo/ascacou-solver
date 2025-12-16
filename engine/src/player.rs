@@ -19,20 +19,12 @@ impl Player {
 	}
 
 	pub fn random_set<R: Rng>(rng: &mut R) -> (Player, Player) {
-		let mut buf = [0u8; 8];
-
-		(0..16).into_iter().choose_multiple_fill(rng, &mut buf);
-		Player::from_current_tiles(buf)
-	}
-
-	/**
-	 * Given a valid list of tiles (8 different tiles, unchecked here)
-	 * return two players: the first one is the current player, the
-	 * second one is its opponent.
-	 */
-	pub fn from_current_tiles(tiles: [u8; 8]) -> (Player, Player) {
-		let tileset = TileSet::from(tiles);
-		(Player::new(tileset), Player::new(!tileset))
+		(0..16)
+			.choose_multiple(rng, 8)
+			.iter()
+			.cloned()
+			.collect::<TileSet>()
+			.into()
 	}
 
 	fn new(tiles: impl Into<TileSet>) -> Player {
@@ -54,7 +46,7 @@ impl Player {
 			.collect::<String>()
 	}
 
-	pub fn for_console(&self, filled_tiles: &Vec<u8>) -> String {
+	pub fn for_console(&self, played_tiles: &TileSet) -> String {
 		let mut str = String::with_capacity(209);
 		for tile in self.tiles {
 			str.push_str(&format!("  {: >2}  ", tile));
@@ -69,7 +61,7 @@ impl Player {
 				} else {
 					str.push(' ')
 				}
-				if filled_tiles.into_iter().any(|t| *t == tile) {
+				if played_tiles.has(tile) {
 					str.push_str("\x1b[44m");
 				} else {
 					str.push_str("\x1b[47m");
@@ -89,6 +81,15 @@ impl Player {
 			str.push('\n');
 		}
 		str
+	}
+}
+
+/// Given a valid list of tiles (8 different tiles, unchecked here)
+/// return two players: the first one is the current player, the
+/// second one is its opponent.
+impl From<TileSet> for (Player, Player) {
+	fn from(tileset: TileSet) -> (Player, Player) {
+		(Player::new(tileset), Player::new(!tileset))
 	}
 }
 

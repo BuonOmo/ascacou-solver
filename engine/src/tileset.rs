@@ -3,9 +3,7 @@ use crate::color::Color;
 const BLACK_COLOR_PRESENCE: [u8; 16] = [0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4];
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub struct TileSet {
-	values: u16,
-} // TODO: decide between TileSet(u16) or TileSet { values: u16 }
+pub struct TileSet(u16);
 
 impl TileSet {
 	pub const fn empty() -> Self {
@@ -13,12 +11,12 @@ impl TileSet {
 	}
 
 	pub const fn new(values: u16) -> Self {
-		TileSet { values }
+		TileSet(values)
 	}
 
 	pub const fn has(&self, val: u8) -> bool {
 		debug_assert!(val < 16);
-		self.values & (1 << val) != 0
+		self.0 & (1 << val) != 0
 	}
 
 	pub const fn try_add(&mut self, val: u8) -> Option<TileSet> {
@@ -26,18 +24,18 @@ impl TileSet {
 		if self.has(val) {
 			return None;
 		}
-		Some(TileSet::new(self.values | (1 << val)))
+		Some(TileSet::new(self.0 | (1 << val)))
 	}
 
 	pub const fn try_union(&self, other: &TileSet) -> Option<TileSet> {
-		if (self.values & other.values) != 0 {
+		if (self.0 & other.0) != 0 {
 			return None;
 		}
-		Some(TileSet::new(self.values | other.values))
+		Some(TileSet::new(self.0 | other.0))
 	}
 
 	pub const fn full(&self) -> bool {
-		self.values == 0xFFFF
+		self.0 == 0xFFFF
 	}
 
 	pub const fn most_present_color(&self) -> Color {
@@ -50,7 +48,7 @@ impl TileSet {
 
 	const fn count_blacks(&self) -> u8 {
 		let mut count = 0;
-		let mut values = self.values;
+		let mut values = self.0;
 
 		while values != 0 {
 			let i = values.trailing_zeros() as usize;
@@ -66,7 +64,7 @@ impl std::ops::Not for TileSet {
 	type Output = TileSet;
 
 	fn not(self) -> TileSet {
-		TileSet::new(!self.values)
+		TileSet::new(!self.0)
 	}
 }
 
@@ -74,11 +72,11 @@ impl Iterator for TileSet {
 	type Item = u8;
 
 	fn next(&mut self) -> Option<Self::Item> {
-		if self.values == 0 {
+		if self.0 == 0 {
 			return None;
 		}
-		let i = self.values.trailing_zeros() as u8;
-		self.values ^= 1 << i;
+		let i = self.0.trailing_zeros() as u8;
+		self.0 ^= 1 << i;
 		Some(i)
 	}
 }

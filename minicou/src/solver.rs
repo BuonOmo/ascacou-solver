@@ -82,27 +82,27 @@ impl Solver {
 		mut alpha: EvaluationScore,
 		beta: EvaluationScore,
 		depth: u8,
-	) -> (EvaluationScore, Option<&'a Move>) {
+	) -> (EvaluationScore, Option<Move>) {
 		self.explored_positions += 1;
 
 		if depth == 0 {
 			return (evaluation(board), None);
 		}
 
-		let boards_and_moves = next_boards::<(Board, &Move)>(&board, false);
+		let boards_and_moves = next_boards::<(Board, Move)>(&board, false);
 
-		let mut best_mov: Option<&Move> = None;
+		let mut best_mov: Option<Move> = None;
 		let mut terminal = true;
 		for (board, mov) in boards_and_moves {
 			terminal = false;
 			let score = -self.negamax(&board, -beta, -alpha, depth - 1);
 			if score >= beta {
-				return (score, Some(&mov));
+				return (score, Some(mov));
 			}
 
 			if score > alpha {
 				alpha = score;
-				best_mov = Some(&mov);
+				best_mov = Some(mov);
 			}
 		}
 		if terminal {
@@ -175,12 +175,33 @@ impl Solver {
 	}
 }
 
+struct MaskIterator(u64);
+
+impl Iterator for MaskIterator {
+	type Item = u64;
+
+	fn next(&mut self) -> Option<Self::Item> {
+		if self.0 == 0 {
+			return None;
+		}
+		let prev = self.0;
+		self.0 &= self.0 - 1;
+		let top_left = prev - self.0;
+		Some(top_left)
+	}
+}
+
 fn next_boards<'a, T>(board: &'a Board, forced: bool) -> MoveIterator<'a, T> {
 	if forced {
+		let x = board.pieces_mask;
 		MoveIterator::Forced(ForcedMoveIterator {
+			almost_full_mask: MaskIterator(
+				(!x & (x >> 1) & (x >> 7) & (x >> 8))
+					| (!x & (x << 1) & (x >> 6) & (x >> 7))
+					| (!x & (x >> 1) & (x << 6) & (x << 7))
+					| (!x & (x << 1) & (x << 7) & (x << 8)),
+			),
 			board,
-			index: 0,
-			len: HEURISTIC_BLACK_FIRST.len() / 2,
 			return_type: std::marker::PhantomData,
 		})
 	} else {
@@ -200,6 +221,10 @@ fn next_boards<'a, T>(board: &'a Board, forced: bool) -> MoveIterator<'a, T> {
 	}
 }
 
+// NOTE: When MoveIterator was bugged
+// and forced moves where actually
+// similar to AllMoves, we ended up
+// with better performance.
 enum MoveIterator<'a, T> {
 	Forced(ForcedMoveIterator<'a, T>),
 	All(AllMoveIterator<'a, T>),
@@ -215,9 +240,9 @@ impl<'a> Iterator for MoveIterator<'a, Board> {
 	}
 }
 
-impl<'a> Iterator for MoveIterator<'a, (Board, &'a Move)> {
-	type Item = (Board, &'a Move);
-	fn next(&mut self) -> Option<(Board, &'a Move)> {
+impl<'a> Iterator for MoveIterator<'a, (Board, Move)> {
+	type Item = (Board, Move);
+	fn next(&mut self) -> Option<(Board, Move)> {
 		match self {
 			MoveIterator::Forced(it) => it.next(),
 			MoveIterator::All(it) => it.next(),
@@ -226,9 +251,8 @@ impl<'a> Iterator for MoveIterator<'a, (Board, &'a Move)> {
 }
 
 struct ForcedMoveIterator<'a, T> {
+	almost_full_mask: MaskIterator,
 	board: &'a Board,
-	index: usize,
-	len: usize,
 	return_type: std::marker::PhantomData<T>,
 }
 
@@ -236,35 +260,35 @@ impl<'a> Iterator for ForcedMoveIterator<'a, Board> {
 	type Item = Board;
 
 	fn next(&mut self) -> Option<Self::Item> {
-		while self.index < self.len {
-			let mov_black = &HEURISTIC_BLACK_FIRST[self.index];
-			let mov_white = &HEURISTIC_BLACK_FIRST[self.len + self.index];
-			self.index += 1;
-			match (self.board.next(mov_black), self.board.next(mov_white)) {
-				(Some(b), None) => return Some(b),
-				(None, Some(w)) => return Some(w),
-				_ => {}
+		match self.almost_full_mask.next() {
+			None => None,
+			Some(mask) => {
+				let (mov_black, mov_white) = Move::from_position(mask);
+				match (self.board.next(&mov_black), self.board.next(&mov_white)) {
+					(Some(b), None) => Some(b),
+					(None, Some(w)) => Some(w),
+					_ => self.next(),
+				}
 			}
 		}
-		None
 	}
 }
 
-impl<'a> Iterator for ForcedMoveIterator<'a, (Board, &'a Move)> {
-	type Item = (Board, &'a Move);
+impl<'a> Iterator for ForcedMoveIterator<'a, (Board, Move)> {
+	type Item = (Board, Move);
 
 	fn next(&mut self) -> Option<Self::Item> {
-		while self.index < self.len {
-			let mov_black = &HEURISTIC_BLACK_FIRST[self.index];
-			let mov_white = &HEURISTIC_BLACK_FIRST[self.len + self.index];
-			self.index += 1;
-			match (self.board.next(mov_black), self.board.next(mov_white)) {
-				(Some(b), None) => return Some((b, mov_black)),
-				(None, Some(w)) => return Some((w, mov_white)),
-				_ => {}
+		match self.almost_full_mask.next() {
+			None => None,
+			Some(mask) => {
+				let (mov_black, mov_white) = Move::from_position(mask);
+				match (self.board.next(&mov_black), self.board.next(&mov_white)) {
+					(Some(b), None) => Some((b, mov_black)),
+					(None, Some(w)) => Some((w, mov_white)),
+					_ => self.next(),
+				}
 			}
 		}
-		None
 	}
 }
 
@@ -291,15 +315,15 @@ impl<'a> Iterator for AllMoveIterator<'a, Board> {
 	}
 }
 
-impl<'a> Iterator for AllMoveIterator<'a, (Board, &'a Move)> {
-	type Item = (Board, &'a Move);
+impl<'a> Iterator for AllMoveIterator<'a, (Board, Move)> {
+	type Item = (Board, Move);
 
 	fn next(&mut self) -> Option<Self::Item> {
 		while self.index < self.len {
 			let mov = &self.heuristic[self.index];
 			self.index += 1;
 			if let Some(b) = self.board.next(mov) {
-				return Some((b, mov));
+				return Some((b, *mov));
 			}
 		}
 		None
@@ -333,7 +357,7 @@ pub fn solve(board: &Board, depth: Option<u8>) -> (EvaluationScore, Option<Move>
 
 	let (score, mov) = solver.negamax0(board, MIN_SCORE, MAX_SCORE, depth);
 
-	(score, mov.cloned(), solver.explored_positions)
+	(score, mov, solver.explored_positions)
 }
 
 pub fn partial_solve(board: &Board, depth: Option<u8>) -> (EvaluationScore, Option<Move>, u128) {
@@ -350,7 +374,7 @@ pub fn partial_solve(board: &Board, depth: Option<u8>) -> (EvaluationScore, Opti
 
 	let (score, mov) = solver.negamax0(board, -1, 1, depth);
 
-	(score, mov.cloned(), solver.explored_positions)
+	(score, mov, solver.explored_positions)
 }
 
 #[cfg(test)]
@@ -364,7 +388,7 @@ mod tests {
 			("bwwb/2www/3wb/bbw/1w1wb 025689ad", vec![]),
 			(
 				"bb1ww/www1w/1bb/1bww/2w 013457df",
-				vec!["wd3", "wa3", "wc1"],
+				vec!["wc1", "wa3", "wd3"],
 			),
 			("wwbw/bb2b/1wwb/2b/wb1wb 124589ef", vec!["wb4"]),
 			("w3w/wbbbb/2b1b/2bw/bwb1w 013568be", vec!["wd3"]),
@@ -379,7 +403,7 @@ mod tests {
 			("bw2b/ww2b/bww1w/w1b/w1w1b 12346cdf", vec!["bb4"]),
 		] {
 			let board = Board::from_fen(fen).unwrap();
-			let forced: Vec<String> = next_boards::<(Board, &Move)>(&board, true)
+			let forced: Vec<String> = next_boards::<(Board, Move)>(&board, true)
 				.map(|(_, m)| String::from(m))
 				.collect();
 			assert_eq!(forced, expected, "for board:\n{}", board.for_console());

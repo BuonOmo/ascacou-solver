@@ -121,12 +121,12 @@ impl Board {
 
 		// Tiles part.
 
-		let mut tiles = [0; 8];
+		let mut tiles = TileSet::empty();
 		let mut i = 0;
 		while let Some(chr) = chars.next() {
 			match chr.to_digit(16) {
 				// No need for a guard there, digit may not be greater than 15.
-				Some(digit) => tiles[i] = digit as u8,
+				Some(digit) => tiles = tiles.try_add(digit as u8).ok_or("Duplicate tile")?,
 				None => return Err("invalid character"),
 			}
 			if i > 7 {
@@ -139,7 +139,7 @@ impl Board {
 			return Err("Not enough tiles");
 		}
 
-		let (current_player, opponent) = Player::from_current_tiles(tiles);
+		let (current_player, opponent) = tiles.into();
 		let pieces_mask = black_mask | white_mask;
 
 		Ok(Board {
@@ -202,17 +202,11 @@ impl Board {
 		true
 	}
 
-	pub fn is_invalid(&self) -> bool {
-		let mut filled_tiles: [bool; 16] = [false; 16];
-		for tile in self.filled_tiles() {
-			if filled_tiles[tile as usize] {
-				return true;
-			}
-			filled_tiles[tile as usize] = true;
-		}
-		false
-	}
-
+	// TODO(perf): We could use the fact that we now have
+	// _played_tiles_ to speed up the score computation.
+	// We could use bitmap comparison for filled tiles
+	// and for played tiles, and compare those two
+	// bitmaps.
 	pub fn current_score(&self) -> i8 {
 		self.filled_tiles().fold(0, |acc, tile| {
 			if self.current_player.has_tile(tile) {
@@ -231,21 +225,11 @@ impl Board {
 		self.is_terminal() && self.current_score() > 0
 	}
 
-	/**
-	 * Find every filled tiles using bit computation.
-	 * If n is the number of filled tiles, this method
-	 * is o(n), it is still quite computation heavy since
-	 * we have to call `tile_at()` for each filled tile.
-	 * Hence cost is roughly: 2 + 6 * n operations.
-	 * TODO: update comment.
-	 */
 	fn filled_tiles(&self) -> FilledTilesIterator {
 		filled_tiles(self.pieces_mask, self.black_mask)
 	}
 
-	/**
-	 * Apply a move and check for validity.
-	 */
+	/// Apply a move and check for validity.
 	pub fn next(&self, mov: &Move) -> Option<Board> {
 		let pos = mov.mask();
 		if pos & self.pieces_mask != 0 {
@@ -320,9 +304,8 @@ impl Board {
 	}
 
 	fn position_mask(x: u8, y: u8) -> u64 {
-		assert!(x < 5);
-		assert!(y < 5);
-		// Board::shift_rows(Board::shift_cols(256u64, x), y)
+		debug_assert!(x < 5);
+		debug_assert!(y < 5);
 		Move::mask_at(x, y)
 	}
 
@@ -351,7 +334,7 @@ impl Board {
 		str.push_str(&self.fen());
 		str.push('\n');
 
-		let filled_tiles: Vec<u8> = self.filled_tiles().collect();
+		let filled_tiles: TileSet = self.filled_tiles().collect();
 		str.push_str(&self.opponent.for_console(&filled_tiles));
 
 		let spacing = " ".repeat((46/* tiles len */ - 12/* board len */) / 2);
@@ -396,6 +379,12 @@ impl Board {
 	}
 }
 
+/// Find every filled tiles using bit computation.
+/// If n is the number of filled tiles, this method
+/// is o(n), it is still quite computation heavy since
+/// we have to call `tile_at()` for each filled tile.
+/// Hence cost is roughly: 2 + (2 + 4 + 6) * n operations.
+/// The 6 being the cost of `trailing_zeros`.
 fn filled_tiles(pieces_mask: u64, black_mask: u64) -> FilledTilesIterator {
 	let mut mask = pieces_mask;
 	// 1 1 & 1 0 = 1 0

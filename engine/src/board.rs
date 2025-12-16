@@ -24,7 +24,7 @@ impl Board {
 			black_mask: 0,
 			current_player,
 			opponent,
-			played_tiles: TileSet::new_unchecked(0),
+			played_tiles: TileSet::empty(),
 		}
 	}
 
@@ -35,7 +35,7 @@ impl Board {
 			black_mask: 0,
 			current_player,
 			opponent,
-			played_tiles: TileSet::new_unchecked(0),
+			played_tiles: TileSet::empty(),
 		}
 	}
 
@@ -286,7 +286,7 @@ impl Board {
 	 * a given move. This function doesn't check for emptiness of the square.
 	 */
 	fn tiles_from<'a>(&self, mov: &'a Move) -> Option<TileSet> {
-		let mut tiles = TileSet::new_unchecked(0);
+		let mut tiles = TileSet::empty();
 		let pos = mov.mask();
 		// A new move impacts up to a 3x3 area.
 		// We can represent it with a number
@@ -500,7 +500,7 @@ mod tests {
 	#[test]
 	fn test_from_fen_set_played_tiles() {
 		let board = Board::from_fen("bb1ww/www1w/1bbw/1bww/2w 2689abce").unwrap();
-		let expected_played_tiles: TileSet = TileSet::new_unchecked(0b0001_0000_1000_1010);
+		let expected_played_tiles: TileSet = TileSet::new(0b0001_0000_1000_1010);
 		assert_eq!(board.played_tiles, expected_played_tiles);
 	}
 

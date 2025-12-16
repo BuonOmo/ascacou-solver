@@ -76,20 +76,20 @@ impl Solver {
 		}
 	}
 
-	fn negamax0(
+	fn negamax0<'a>(
 		&mut self,
-		board: &Board,
+		board: &'a Board,
 		mut alpha: EvaluationScore,
 		beta: EvaluationScore,
 		depth: u8,
-	) -> (EvaluationScore, Option<&Move>) {
+	) -> (EvaluationScore, Option<&'a Move>) {
 		self.explored_positions += 1;
 
 		if depth == 0 {
 			return (evaluation(board), None);
 		}
 
-		let boards_and_moves = next_boards_and_moves(&board, false);
+		let boards_and_moves = next_boards::<(Board, &Move)>(&board, false);
 
 		let mut best_mov: Option<&Move> = None;
 		let mut terminal = true;
@@ -97,12 +97,12 @@ impl Solver {
 			terminal = false;
 			let score = -self.negamax(&board, -beta, -alpha, depth - 1);
 			if score >= beta {
-				return (score, Some(&mov)); // TODO: handle the none stuff
+				return (score, Some(&mov));
 			}
 
 			if score > alpha {
 				alpha = score;
-				best_mov = Some(&mov); // TODO: handle the best move stuff
+				best_mov = Some(&mov);
 			}
 		}
 		if terminal {
@@ -138,7 +138,7 @@ impl Solver {
 			return evaluation(board);
 		}
 
-		let boards = next_boards(&board, depth <= FORCED_MOVE_DEPTH);
+		let boards = next_boards::<Board>(&board, depth <= FORCED_MOVE_DEPTH);
 
 		let mut terminal = true;
 
@@ -175,58 +175,134 @@ impl Solver {
 	}
 }
 
-// TODO: use Iterator trait rather than generators.
-gen fn next_boards_and_moves(board: &Board, forced: bool) -> (Board, &'static Move) {
+fn next_boards<'a, T>(board: &'a Board, forced: bool) -> MoveIterator<'a, T> {
 	if forced {
-		let len = HEURISTIC_BLACK_FIRST.len() / 2;
-		for i in 0..HEURISTIC_BLACK_FIRST.len() / 2 {
-			let mov_black = &HEURISTIC_BLACK_FIRST[i];
-			let mov_white = &HEURISTIC_BLACK_FIRST[len + i];
-			match (board.next(mov_black), board.next(mov_white)) {
-				(Some(b), None) => yield (b, mov_black),
-				(None, Some(w)) => yield (w, mov_white),
-				_ => {}
-			}
-		}
+		MoveIterator::Forced(ForcedMoveIterator {
+			board,
+			index: 0,
+			len: HEURISTIC_BLACK_FIRST.len() / 2,
+			return_type: std::marker::PhantomData,
+		})
 	} else {
 		let black_fav = board.current_player.favorite_color == ascacou::Color::Black;
-		let preferred_heuristic = if black_fav {
+		let heuristic = if black_fav {
 			&HEURISTIC_BLACK_FIRST
 		} else {
 			&HEURISTIC_WHITE_FIRST
 		};
-		for mov in preferred_heuristic {
-			if let Some(next_board) = board.next(mov) {
-				yield (next_board, mov);
-			};
+		MoveIterator::All(AllMoveIterator {
+			board,
+			index: 0,
+			len: heuristic.len(),
+			heuristic,
+			return_type: std::marker::PhantomData,
+		})
+	}
+}
+
+enum MoveIterator<'a, T> {
+	Forced(ForcedMoveIterator<'a, T>),
+	All(AllMoveIterator<'a, T>),
+}
+
+impl<'a> Iterator for MoveIterator<'a, Board> {
+	type Item = Board;
+	fn next(&mut self) -> Option<Board> {
+		match self {
+			MoveIterator::Forced(it) => it.next(),
+			MoveIterator::All(it) => it.next(),
 		}
 	}
 }
 
-gen fn next_boards(board: &Board, forced: bool) -> Board {
-	if forced {
-		let len = HEURISTIC_BLACK_FIRST.len() / 2;
-		for i in 0..HEURISTIC_BLACK_FIRST.len() / 2 {
-			let mov_black = &HEURISTIC_BLACK_FIRST[i];
-			let mov_white = &HEURISTIC_BLACK_FIRST[len + i];
-			match (board.next(mov_black), board.next(mov_white)) {
-				(Some(b), None) => yield b,
-				(None, Some(w)) => yield w,
+impl<'a> Iterator for MoveIterator<'a, (Board, &'a Move)> {
+	type Item = (Board, &'a Move);
+	fn next(&mut self) -> Option<(Board, &'a Move)> {
+		match self {
+			MoveIterator::Forced(it) => it.next(),
+			MoveIterator::All(it) => it.next(),
+		}
+	}
+}
+
+struct ForcedMoveIterator<'a, T> {
+	board: &'a Board,
+	index: usize,
+	len: usize,
+	return_type: std::marker::PhantomData<T>,
+}
+
+impl<'a> Iterator for ForcedMoveIterator<'a, Board> {
+	type Item = Board;
+
+	fn next(&mut self) -> Option<Self::Item> {
+		while self.index < self.len {
+			let mov_black = &HEURISTIC_BLACK_FIRST[self.index];
+			let mov_white = &HEURISTIC_BLACK_FIRST[self.len + self.index];
+			self.index += 1;
+			match (self.board.next(mov_black), self.board.next(mov_white)) {
+				(Some(b), None) => return Some(b),
+				(None, Some(w)) => return Some(w),
 				_ => {}
 			}
 		}
-	} else {
-		let black_fav = board.current_player.favorite_color == ascacou::Color::Black;
-		let preferred_heuristic = if black_fav {
-			&HEURISTIC_BLACK_FIRST
-		} else {
-			&HEURISTIC_WHITE_FIRST
-		};
-		for mov in preferred_heuristic {
-			if let Some(next_board) = board.next(mov) {
-				yield next_board;
-			};
+		None
+	}
+}
+
+impl<'a> Iterator for ForcedMoveIterator<'a, (Board, &'a Move)> {
+	type Item = (Board, &'a Move);
+
+	fn next(&mut self) -> Option<Self::Item> {
+		while self.index < self.len {
+			let mov_black = &HEURISTIC_BLACK_FIRST[self.index];
+			let mov_white = &HEURISTIC_BLACK_FIRST[self.len + self.index];
+			self.index += 1;
+			match (self.board.next(mov_black), self.board.next(mov_white)) {
+				(Some(b), None) => return Some((b, mov_black)),
+				(None, Some(w)) => return Some((w, mov_white)),
+				_ => {}
+			}
 		}
+		None
+	}
+}
+
+struct AllMoveIterator<'a, T> {
+	board: &'a Board,
+	index: usize,
+	len: usize,
+	heuristic: &'a [Move; 50],
+	return_type: std::marker::PhantomData<T>,
+}
+
+impl<'a> Iterator for AllMoveIterator<'a, Board> {
+	type Item = Board;
+
+	fn next(&mut self) -> Option<Self::Item> {
+		while self.index < self.len {
+			let mov = &self.heuristic[self.index];
+			self.index += 1;
+			if let Some(b) = self.board.next(mov) {
+				return Some(b);
+			}
+		}
+		None
+	}
+}
+
+impl<'a> Iterator for AllMoveIterator<'a, (Board, &'a Move)> {
+	type Item = (Board, &'a Move);
+
+	fn next(&mut self) -> Option<Self::Item> {
+		while self.index < self.len {
+			let mov = &self.heuristic[self.index];
+			self.index += 1;
+			if let Some(b) = self.board.next(mov) {
+				return Some((b, mov));
+			}
+		}
+		None
 	}
 }
 
@@ -303,14 +379,10 @@ mod tests {
 			("bw2b/ww2b/bww1w/w1b/w1w1b 12346cdf", vec!["bb4"]),
 		] {
 			let board = Board::from_fen(fen).unwrap();
-			let new_boards: Vec<String> = expected
-				.iter()
-				.filter_map(|s| Move::try_from(s.as_ref()).ok())
-				.filter_map(|m| board.next(&m))
-				.map(|b| b.fen())
+			let forced: Vec<String> = next_boards::<(Board, &Move)>(&board, true)
+				.map(|(_, m)| String::from(m))
 				.collect();
-			let forced: Vec<String> = next_boards(&board, true).map(|b| b.fen()).collect();
-			assert_eq!(forced, new_boards, "for board:\n{}", board.for_console());
+			assert_eq!(forced, expected, "for board:\n{}", board.for_console());
 		}
 	}
 	#[test]

@@ -250,11 +250,7 @@ impl Board {
 		})
 	}
 
-	// TODO(perf): maybe a simpler way to implement this algorithm is to play
-	// the move and only then check for duplicates.
-	/**
-	 * A dup move is a move that generates two times the same tile, hence it is invalid.
-	 */
+	/// A dup move is a move that generates two times the same tile, hence it is invalid.
 	fn already_played_or_dup_move<'a>(&'a self, mov: &'a Move) -> bool {
 		let Some(tiles_from_move) = self.tiles_from(&mov) else {
 			return true; // dup move

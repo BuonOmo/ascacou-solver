@@ -8,13 +8,12 @@ pub struct TileSet {
 } // TODO: decide between TileSet(u16) or TileSet { values: u16 }
 
 impl TileSet {
-	pub const fn new_unchecked(values: u16) -> Self {
-		TileSet { values }
+	pub const fn empty() -> Self {
+		TileSet::new(0)
 	}
 
 	pub const fn new(values: u16) -> Self {
-		debug_assert!(values.count_ones() == 8);
-		TileSet::new_unchecked(values)
+		TileSet { values }
 	}
 
 	pub const fn has(&self, val: u8) -> bool {
@@ -27,14 +26,14 @@ impl TileSet {
 		if self.has(val) {
 			return None;
 		}
-		Some(TileSet::new_unchecked(self.values | (1 << val)))
+		Some(TileSet::new(self.values | (1 << val)))
 	}
 
 	pub const fn try_union(&self, other: &TileSet) -> Option<TileSet> {
 		if (self.values & other.values) != 0 {
 			return None;
 		}
-		Some(TileSet::new_unchecked(self.values | other.values))
+		Some(TileSet::new(self.values | other.values))
 	}
 
 	pub const fn full(&self) -> bool {
@@ -111,25 +110,13 @@ impl std::iter::FromIterator<u8> for TileSet {
 		for tile in iter {
 			values |= 1 << tile;
 		}
-		TileSet { values }
+		TileSet::new(values)
 	}
 }
 
 #[cfg(test)]
 mod tests {
 	use super::*;
-
-	#[test]
-	#[should_panic(expected = "assertion failed: values.count_ones() == 8")]
-	fn test_invalid_tileset_creation_from_new() {
-		let _tileset = TileSet::new(0b0000_0000_0000_1111);
-	}
-
-	#[test]
-	#[should_panic(expected = "assertion failed: values.count_ones() == 8")]
-	fn test_invalid_tileset_creation_from_iterator() {
-		let _tileset: TileSet = vec![0, 1, 2, 3, 4, 5, 6].into();
-	}
 
 	#[test]
 	fn test_tileset_iterator() {

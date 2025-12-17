@@ -104,11 +104,11 @@ impl Board {
 				'4' => x += 4,
 				'5' => x += 5,
 				'b' => {
-					black_mask |= Board::position_mask(x, y);
+					black_mask |= Move::mask_at(x, y);
 					x += 1;
 				}
 				'w' => {
-					white_mask |= Board::position_mask(x, y);
+					white_mask |= Move::mask_at(x, y);
 					x += 1;
 				}
 				_ => return Err("invalid character"),
@@ -159,7 +159,7 @@ impl Board {
 			}
 			let mut idx = 0;
 			for x in 0..5 {
-				if Board::position_mask(x, y) & self.pieces_mask == 0 {
+				if Move::mask_at(x, y) & self.pieces_mask == 0 {
 					idx += 1;
 					continue;
 				}
@@ -168,7 +168,7 @@ impl Board {
 					str += &idx.to_string();
 					idx = 0
 				}
-				str.push_str(if Board::position_mask(x, y) & self.black_mask == 0 {
+				str.push_str(if Move::mask_at(x, y) & self.black_mask == 0 {
 					"w"
 				} else {
 					"b"
@@ -180,20 +180,28 @@ impl Board {
 	}
 
 	pub gen fn possible_moves(&self) -> Move {
-		for x in 0..5 {
-			for y in 0..5 {
-				for color in [Color::Black, Color::White] {
-					let mov = Move::new(x, y, color);
-					if self.is_move_possible(&mov) {
-						yield mov;
-					}
+		let board_full_mask = 0b0000000_0111110_0111110_0111110_0111110_0111110_0000000u64;
+		let mut available_spots = !self.pieces_mask & board_full_mask;
+		while available_spots != 0 {
+			// TODO(perf): benchmark the most efficient way to iterate over bits
+			// and extract that in a util crate.
+			//
+			// See https://graphics.stanford.edu/~seander/bithacks.html
+			let i = available_spots.trailing_zeros();
+			let mov_mask = 1u64 << i;
+			available_spots ^= mov_mask;
+
+			for color in [Color::Black, Color::White] {
+				let mov = Move::from_mask(mov_mask, color);
+				if self.is_move_possible(&mov) {
+					yield mov;
 				}
 			}
 		}
 	}
 
 	pub fn is_move_possible(&self, mov: &Move) -> bool {
-		if mov.mask() & self.pieces_mask != 0 {
+		if mov.mask & self.pieces_mask != 0 {
 			return false;
 		}
 		if self.already_played_or_dup_move(mov) {
@@ -218,7 +226,7 @@ impl Board {
 	}
 
 	pub fn is_terminal(&self) -> bool {
-		self.played_tiles.full() || self.possible_moves().next().is_none()
+		self.played_tiles.is_full() || self.possible_moves().next().is_none()
 	}
 
 	pub fn is_winning(&self) -> bool {
@@ -231,7 +239,7 @@ impl Board {
 
 	/// Apply a move and check for validity.
 	pub fn next(&self, mov: &Move) -> Option<Board> {
-		let pos = mov.mask();
+		let pos = mov.mask;
 		if pos & self.pieces_mask != 0 {
 			return None;
 		}
@@ -267,7 +275,6 @@ impl Board {
 	 */
 	fn tiles_from<'a>(&self, mov: &'a Move) -> Option<TileSet> {
 		let mut tiles = TileSet::empty();
-		let pos = mov.mask();
 		// A new move impacts up to a 3x3 area.
 		// We can represent it with a number
 		// that we'll have to move exactly
@@ -281,13 +288,10 @@ impl Board {
 		// bits  0, 1, 2, 7, 8, 9, 14, 15, 16.
 		// Hence 0b0000111_0000111_0000111 is
 		// the mask to move around.
-		let impacted_area = Board::shift_rows(
-			Board::shift_cols(0b0000111_0000111_0000111u64, mov.x as i8),
-			mov.y as i8,
-		);
-		let new_mask = (self.pieces_mask | pos) & impacted_area;
+		let impacted_area = 0b0000111_0000111_0000111u64 << mov.shift();
+		let new_mask = (self.pieces_mask | mov.mask) & impacted_area;
 		let new_black_mask = if mov.color == Color::Black {
-			self.black_mask | pos
+			self.black_mask | mov.mask
 		} else {
 			self.black_mask
 		};
@@ -297,32 +301,6 @@ impl Board {
 		}
 
 		Some(tiles)
-	}
-
-	fn position_mask(x: u8, y: u8) -> u64 {
-		debug_assert!(x < 5);
-		debug_assert!(y < 5);
-		Move::mask_at(x, y)
-	}
-
-	fn shift_rows(mask: u64, num_rows: i8) -> u64 {
-		debug_assert!(-5 < num_rows && num_rows < 5);
-		// See position_mask for the 7x7 board size explanation.
-		if num_rows < 0 {
-			mask >> -7 * num_rows
-		} else {
-			mask << 7 * num_rows
-		}
-	}
-
-	fn shift_cols(mask: u64, num_cols: i8) -> u64 {
-		debug_assert!(-5 < num_cols && num_cols < 5);
-		// See position_mask for the 7x7 board size explanation.
-		if num_cols < 0 {
-			mask >> -num_cols
-		} else {
-			mask << num_cols
-		}
 	}
 
 	pub fn for_console(&self) -> String {
@@ -344,7 +322,7 @@ impl Board {
 			str.push_str(" \x1b[47m");
 
 			for x in 0..5 {
-				let position = Board::position_mask(x, y);
+				let position = Move::mask_at(x, y);
 
 				str.push_str(" ");
 
@@ -448,7 +426,7 @@ mod tests {
 
 	macro_rules! assert_tile {
 		($board:expr, ($x:expr, $y:expr), $tile:expr) => {
-			let result = tile_at(&$board.black_mask, Board::position_mask($x, $y));
+			let result = tile_at(&$board.black_mask, Move::mask_at($x, $y));
 			assert_eq!(
 				result, $tile,
 				"\nExpected: {:0>4b},\n     got: {:0>4b}",
@@ -514,31 +492,11 @@ mod tests {
 	}
 
 	#[test]
-	fn tiles_from() {
+	fn test_tiles_from() {
 		let mov = Move::try_from("wd2").unwrap();
 		let board = Board::from_fen("2wwb/2w1b/2wbb/5/5 01234567").unwrap();
 		println!("{}\nChecking tiles from move {}", board, mov);
 		assert_eq!(board.tiles_from(&mov).unwrap(), vec![0, 10, 8, 14].into())
-	}
-
-	#[test]
-	fn position_mask() {
-		assert_eq!(
-			Board::position_mask(0, 0),
-			1u64 << 8,
-			"position (0, 0) is incorrect"
-		);
-		let expected = 1u64 << 9;
-		assert_eq!(
-			Board::position_mask(1, 0),
-			expected,
-			"position (1, 0) is incorrect"
-		);
-		assert_eq!(
-			Board::position_mask(0, 1),
-			1u64 << 15,
-			"position (0, 1) is incorrect"
-		)
 	}
 
 	#[test]

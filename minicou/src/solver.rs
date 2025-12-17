@@ -1,4 +1,4 @@
-use ascacou::{Board, Move};
+use ascacou::{Board, Color::*, Move};
 
 pub struct Solver {
 	explored_positions: u128,
@@ -263,7 +263,8 @@ impl<'a> Iterator for ForcedMoveIterator<'a, Board> {
 		match self.almost_full_mask.next() {
 			None => None,
 			Some(mask) => {
-				let (mov_black, mov_white) = Move::from_position(mask);
+				let mov_black = Move::from_mask(mask, Black);
+				let mov_white = Move::from_mask(mask, White);
 				match (self.board.next(&mov_black), self.board.next(&mov_white)) {
 					(Some(b), None) => Some(b),
 					(None, Some(w)) => Some(w),
@@ -281,7 +282,8 @@ impl<'a> Iterator for ForcedMoveIterator<'a, (Board, Move)> {
 		match self.almost_full_mask.next() {
 			None => None,
 			Some(mask) => {
-				let (mov_black, mov_white) = Move::from_position(mask);
+				let mov_black = Move::from_mask(mask, Black);
+				let mov_white = Move::from_mask(mask, White);
 				match (self.board.next(&mov_black), self.board.next(&mov_white)) {
 					(Some(b), None) => Some((b, mov_black)),
 					(None, Some(w)) => Some((w, mov_white)),

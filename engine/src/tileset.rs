@@ -2,7 +2,7 @@ use crate::color::Color;
 
 const BLACK_COLOR_PRESENCE: [u8; 16] = [0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4];
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(PartialEq, Eq, Clone, Copy)]
 pub struct TileSet(u16);
 
 impl TileSet {
@@ -21,20 +21,23 @@ impl TileSet {
 
 	pub const fn try_add(&mut self, val: u8) -> Option<TileSet> {
 		debug_assert!(val < 16);
-		if self.has(val) {
-			return None;
+		let tile_mask = 1 << val;
+		// We could use `has` here, but this avoids one
+		// extra bit shift operation.
+		match self.0 & tile_mask {
+			0 => Some(TileSet::new(self.0 | tile_mask)),
+			_ => None,
 		}
-		Some(TileSet::new(self.0 | (1 << val)))
 	}
 
 	pub const fn try_union(&self, other: &TileSet) -> Option<TileSet> {
-		if (self.0 & other.0) != 0 {
-			return None;
+		match self.0 & other.0 {
+			0 => Some(TileSet::new(self.0 | other.0)),
+			_ => None,
 		}
-		Some(TileSet::new(self.0 | other.0))
 	}
 
-	pub const fn full(&self) -> bool {
+	pub const fn is_full(&self) -> bool {
 		self.0 == 0xFFFF
 	}
 
@@ -64,7 +67,17 @@ impl std::ops::Not for TileSet {
 	type Output = TileSet;
 
 	fn not(self) -> TileSet {
+		// NOTE: this only works because a tileset
+		// has exactly 16 tiles, hence every bit
+		// matters. Otherwise this would overflow
+		// in unknown territory.
 		TileSet::new(!self.0)
+	}
+}
+
+impl std::fmt::Debug for TileSet {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.write_fmt(format_args!("TileSet({:0>16b})", self.0))
 	}
 }
 

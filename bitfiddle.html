@@ -1,93 +1,173 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-	<!-- https://jsfiddle.net/ulysse_bn/4Lyw07oh/3/ -->
-	<meta charset="UTF-8">
-	<meta http-equiv="X-UA-Compatible" content="IE=edge">
-	<title>Bitfiddle</title>
-	<style>
-		.row { display: flex; font-size: 9.5px; text-align: center; }
-		.cell { width: 50px; height: 50px; margin: 1px; border: 1px solid black; }
-		.cell.on { background: black; color: white }
-	</style>
-</head>
-<body>
-	<div id="container"></div>
-
-
-	<div>&nbsp;</div>
-	<input type="text" id="text" placeholder="x & (x << 7)">
-	<input type="button" value="apply" id="apply">
-	<input type="button" value="prev" id="prev">
-	<script>
-		let width = 6
-		let height = 5
-
-		let val = 0
-
-		let history = []
-
-		let s = ""
-
-		for (let i = 0; i < height; i++) {
-			s += '<div class="row">'
-			for (let j = 0; j < width; j++) {
-			let v =  i + (j * height)
-			s += `<div class="cell cell${v} off" data-exp=${v}> ${v} </div>`
-		}
-		s += '</div>'
-		}
-
-		container.innerHTML = s
-
-		const getValue = () => { return val }
-		const setValue = (x) => {
-		console.table(history)
-			val = x
-		for (let i = 0; i < height * width; i++) {
-			let cell = document.querySelector(`.cell${i}`)
-
-			if ((val & (1 << i)) != 0) {
-				cell.classList.add('on')
-			} else {
-				cell.classList.remove('on')
+	<head>
+		<meta charset="UTF-8" />
+		<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+		<title>Bitfiddle</title>
+		<style>
+			:root {
+				--bg: #111;
+				--fg: #fee;
 			}
-		}
-		}
+			body {
+				text-align: center;
+				max-width: 800px;
+				padding-top: 20px;
+				margin: 0 auto;
+				background: var(--bg);
+				color: var(--fg);
+				font-family: monospace;
+			}
+			.row {
+				justify-content: center;
+				display: flex;
+				font-size: 9.5px;
+				text-align: center;
+			}
+			.cell {
+				width: 50px;
+				height: 50px;
+				margin: 1px;
+				border: 1px solid var(--fg);
+			}
+			.cell.on {
+				background: var(--fg);
+				color: var(--bg);
+			}
+			.error {
+				animation: err 0.2s ease-in-out 0s 3;
+				background-color: buttonface;
+			}
+			@keyframes err {
+				0% {
+					background-color: red;
+				}
+				50% {
+					background-color: buttonface;
+				}
+				100% {
+					background-color: red;
+				}
+			}
+		</style>
+	</head>
+	<body>
+		<div id="container"></div>
 
-		document.addEventListener('click', (e) => {
-			if (!e.target.classList.contains('cell')) { return }
+		<div>&nbsp;</div>
+		<input type="text" id="text" placeholder="x & (x << 7)" />
+		<input type="button" value="apply" id="apply" />
+		<input type="button" value="prev" id="prev" />
+		<pre id="history"></pre>
+		<script>
+			let width = 7
+			let height = 7
 
-		if (e.target.classList.contains('on')) {
-			e.target.classList.remove('on')
-			let mask = ((1 << (width * height)) - 1) ^ (1 << +e.target.dataset.exp)
-			val = val & mask
-		} else {
-			val = val | (1 << +e.target.dataset.exp)
-			e.target.classList.add('on')
-		}
-		e.preventDefault()
-		})
+			let val = 0n
 
-		apply.addEventListener('click', (e) => {
-			x = getValue()
-		history.push([text.value, x])
-		x = eval(text.value)
-		setValue(x)
-		text.value = ''
-		e.preventDefault()
-		})
+			let history = []
 
-		prev.addEventListener('click', (e) => {
-			let [tr, x] = history.pop()
-		console.log(history)
-		console.log(x)
-		text.value = tr
-		setValue(x)
-		e.preventDefault()
-		})
+			let s = ''
 
-		// x & (x << 1)
-	</script>
-</body>
+			for (let i = 0; i < height; i++) {
+				s += '<div class="row">'
+				for (let j = 0; j < width; j++) {
+					let v = i + j * height
+					s += `<div class="cell cell${v}" data-exp=${v}> ${v} </div>`
+				}
+				s += '</div>'
+			}
+
+			container.innerHTML = s
+
+			const getValue = () => {
+				return val
+			}
+			const setValue = (x) => {
+				x = BigInt(x)
+				console.table(history)
+				document.getElementById('history').innerText = history
+					.map(
+						([t, v]) =>
+							`${v.toString(2).padStart(width * height, '0')} => ${t}`,
+					)
+					.join('\n')
+				console.log('setValue', { val, x })
+				val = x
+				for (let i = 0; i < height * width; i++) {
+					let cell = document.querySelector(`.cell${i}`)
+
+					if ((val & (1n << BigInt(i))) != 0) {
+						cell.classList.add('on')
+					} else {
+						cell.classList.remove('on')
+					}
+				}
+			}
+
+			document.addEventListener('click', (e) => {
+				if (!e.target.classList.contains('cell')) {
+					return
+				}
+
+				val = val ^ (1n << BigInt(e.target.dataset.exp))
+				if (e.target.classList.contains('on')) {
+					e.target.classList.remove('on')
+				} else {
+					e.target.classList.add('on')
+				}
+				e.preventDefault()
+			})
+
+			apply.addEventListener('click', (e) => {
+				if (text.value.trim() == '') {
+					err(apply)
+					return
+				}
+				x = getValue()
+				console.log('before', x)
+				history.push([text.value, x])
+				console.log(
+					text.value
+						.replaceAll('!', '~')
+						.replaceAll(/\d+\b/g, (m) => {
+							return BigInt(m) + 'n'
+						}),
+				)
+				x = eval(
+					text.value
+						.replaceAll('!', '~')
+						.replaceAll(/\d+\b/g, (m) => {
+							return BigInt(m) + 'n'
+						}),
+				)
+				console.log('after', x)
+				setValue(x)
+				text.value = ''
+				e.preventDefault()
+			})
+
+			prev.addEventListener('click', (e) => {
+				if (history.length == 0) {
+					err(prev)
+					return
+				}
+				let [tr, x] = history.pop()
+				console.log(history)
+				console.log(x)
+				text.value = tr
+				setValue(x)
+				e.preventDefault()
+			})
+
+			const err = (el) => {
+				el.classList.add('error')
+				setTimeout(() => {
+					el.classList.remove('error')
+				}, 800)
+			}
+
+			// x & (x << 1)
+		</script>
+	</body>
 </html>

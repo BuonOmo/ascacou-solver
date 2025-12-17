@@ -1,14 +1,27 @@
 use ascacou::{Board, Color::*, Move};
 
-pub struct Solver {
-	explored_positions: u128,
-	transposition_table: std::collections::HashMap<u128, EvaluationScore>,
+use crate::transposition_table::TranspositionTable;
+
+const fn parse_usize(s: &str) -> usize {
+	let mut bytes = s.as_bytes();
+	let mut result = 0;
+	while let [byte, rest @ ..] = bytes {
+		assert!(b'0' <= *byte && *byte <= b'9', "invalid digit");
+		result = result * 10 + (*byte - b'0') as usize;
+		bytes = rest;
+	}
+	result
 }
 
-pub use std::primitive::i16 as EvaluationScore;
+pub struct Solver {
+	explored_positions: u128,
+	transposition_table: TranspositionTable,
+}
 
-const MIN_SCORE: EvaluationScore = -100;
-const MAX_SCORE: EvaluationScore = 100;
+pub use std::primitive::i8 as EvaluationScore;
+
+const MIN_SCORE: EvaluationScore = -8;
+const MAX_SCORE: EvaluationScore = 8;
 
 /// Depth of forced moves search. These moves will
 /// be explored when depth is exhausted to make sure
@@ -69,10 +82,10 @@ const HEURISTIC_WHITE_FIRST: [Move; 50] = heuristic_moves!(white => black [
 ]);
 
 impl Solver {
-	fn new() -> Solver {
+	fn new(transposition_table: TranspositionTable) -> Solver {
 		Solver {
 			explored_positions: 0,
-			transposition_table: std::collections::HashMap::new(),
+			transposition_table,
 		}
 	}
 
@@ -125,9 +138,9 @@ impl Solver {
 		let key = key(&board);
 
 		// Reduce window by finding a transposition with a lower beta.
-		if let Some(cached_beta) = self.transposition_table.get(&key) {
-			if beta > *cached_beta {
-				beta = *cached_beta;
+		if let Some(cached_beta) = self.transposition_table.get(key) {
+			if beta > cached_beta {
+				beta = cached_beta;
 				if alpha >= beta {
 					return beta;
 				}
@@ -332,10 +345,21 @@ impl<'a> Iterator for AllMoveIterator<'a, (Board, Move)> {
 	}
 }
 
-// TODO(perf): Design a u64 key, and try partial key matching.
-// See https://www.chessprogramming.org/Transposition_Table
-fn key(board: &Board) -> u128 {
-	(board.pieces_mask as u128) | ((board.black_mask as u128) << 64)
+fn key(board: &Board) -> u64 {
+	fit(board.pieces_mask) | fit(board.black_mask) << 25
+}
+
+/// Our boards are represented by a 7 by 7 grid, but
+/// we only care about the 5 by 5 center part. So
+/// we can fit this in 25 consecutive bits.
+/// See also https://www.chessprogramming.org/Transposition_Table
+fn fit(value: u64) -> u64 {
+	let a = (value & 0b0111110_0000000) >> (1 * 7 + 1 - 0 * 5);
+	let b = (value & 0b0111110_0000000_0000000) >> (2 * 7 + 1 - 1 * 5);
+	let c = (value & 0b0111110_0000000_0000000_0000000) >> (3 * 7 + 1 - 2 * 5);
+	let d = (value & 0b0111110_0000000_0000000_0000000_0000000) >> (4 * 7 + 1 - 3 * 5);
+	let e = (value & 0b0111110_0000000_0000000_0000000_0000000_0000000) >> (5 * 7 + 1 - 4 * 5);
+	a | b | c | d | e
 }
 
 // TODO: a smarter score computation could be done by taking into
@@ -351,9 +375,14 @@ fn evaluation(board: &Board) -> EvaluationScore {
 }
 
 pub fn solve(board: &Board, depth: Option<u8>) -> (EvaluationScore, Option<Move>, u128) {
-	let mut solver = Solver::new();
+	let mut solver: Solver = Solver::new(TranspositionTable::new(8_388_593));
 
 	let move_count: usize = board.possible_moves().count();
+	// Adding FORCED_MOVE_DEPTH to the max depth to ensure we
+	// explore non-forcing moves up to the maximum if we can
+	// and only rely on forced moves if we cannot explore
+	// to full depth. Otherwise, we may end up not exploring
+	// some non-forced last moves.
 	let max_depth = (move_count + 1) / 2;
 	let depth = depth.unwrap_or(max_depth as u8).min(max_depth as u8);
 
@@ -363,7 +392,7 @@ pub fn solve(board: &Board, depth: Option<u8>) -> (EvaluationScore, Option<Move>
 }
 
 pub fn partial_solve(board: &Board, depth: Option<u8>) -> (EvaluationScore, Option<Move>, u128) {
-	let mut solver = Solver::new();
+	let mut solver: Solver = Solver::new(TranspositionTable::new(8_388_593));
 
 	let move_count: u8 = board.possible_moves().count() as u8;
 	// Adding FORCED_MOVE_DEPTH to the max depth to ensure we
@@ -383,6 +412,31 @@ pub fn partial_solve(board: &Board, depth: Option<u8>) -> (EvaluationScore, Opti
 mod tests {
 	use super::*;
 	use std::assert_matches::assert_matches;
+
+	#[test]
+	fn test_fit() {
+		macro_rules! assert_fits {
+			($value:expr, $expected:expr) => {
+				let fitted = fit($value);
+				assert_eq!(
+					fitted, $expected,
+					"\n left: {:025b}\nright: {:025b}",
+					fitted, $expected
+				);
+			};
+		}
+		let value: u64 = 0b0111110_0111110_0111110_0111110_0111110_0000000;
+		assert_fits!(value, 0b11111_11111_11111_11111_11111u64);
+
+		let value: u64 = 0b0011110_0101110_0110110_0111010_0111100_0000000;
+		assert_fits!(value, 0b01111_10111_11011_11101_11110u64);
+
+		let value: u64 = 0b0000010_0000100_0001000_0010000_0100000_0000000;
+		assert_fits!(value, 0b00001_00010_00100_01000_10000u64);
+
+		let value: u64 = 0b1111111_1000001_1000001_1000001_1000001_1000001_1111111;
+		assert_fits!(value, 0u64);
+	}
 
 	#[test]
 	fn test_forced_moves() {

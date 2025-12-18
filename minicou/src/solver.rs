@@ -348,10 +348,13 @@ fn key(board: &Board) -> u128 {
 // available moves.
 fn evaluation(board: &Board) -> EvaluationScore {
 	let played_move_influence = match board.played_moves {
-		0..=10 => 1,
-		11..=15 => 2,
-		16..=20 => 4,
-		_ => 8,
+		0..=3 => 0,
+		4..=8 => 1,
+		9..=12 => 2,
+		13..=15 => 4,
+		16..=18 => 8,
+		19..=21 => 16,
+		22.. => 32,
 	};
 	board.current_score() as EvaluationScore * played_move_influence
 }

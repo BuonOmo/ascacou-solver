@@ -16,6 +16,7 @@ required-features = ["cli"]
 [dependencies]
 ascacou.workspace = true
 clap = { workspace = true, optional = true }
+rand.workspace = true
 
 [features]
 cli = ["clap"]

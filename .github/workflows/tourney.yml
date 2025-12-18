@@ -1,4 +1,5 @@
 name: Tourney
+run-name: '${{ inputs.old_version }} 🆚 ${{ inputs.new_version }}'
 
 on:
   workflow_call:
@@ -48,8 +49,17 @@ jobs:
       - name: Prepare executables
         run: |
           case "${{ inputs.old_version }}" in
-            last_tag) old=$(git describe --tags --abbrev=0) ;;
+            last_tag) old="$(git describe --tags --abbrev=0)" ;;
+            ":/"*) old="${{ inputs.old_version }}" ;;
+            *": "*) old=":/${{ inputs.old_version }}" ;;
             *) old="${{ inputs.old_version }}" ;;
+          esac
+
+          case "${{ inputs.new_version }}" in
+            last_tag) new="$(git describe --tags --abbrev=0)" ;;
+            ":/"*) new="${{ inputs.new_version }}" ;;
+            *": "*) new=":/${{ inputs.new_version }}" ;;
+            *) new="${{ inputs.new_version }}" ;;
           esac
 
           mkdir exe
@@ -57,11 +67,11 @@ jobs:
           cargo build --release --bin=game-info
           mv target/release/game-info exe/game_info
 
-          git checkout "${{ inputs.new_version }}"
+          git checkout "$new"
           cargo build --release --features=cli --bin=minicou
           mv target/release/minicou exe/new
 
-          git checkout $old
+          git checkout "$old"
           cargo build --release --features=cli --bin=minicou
           mv target/release/minicou exe/old
       - name: Upload executables
@@ -113,6 +123,8 @@ jobs:
           echo "| set | average score | std dev |" >> $GITHUB_STEP_SUMMARY
           echo "|:----|--------------:|--------:|" >> $GITHUB_STEP_SUMMARY
           for set in endgame midgame earlygame startgame; do
+            compgen -G "outputs/output-${set}-*" > /dev/null || continue
+
             set_total=$(cat outputs/output-${set}-*/* | paste -sd+ - | bc)
             set_count=$(ls outputs/output-${set}-*/* | wc -l)
             set_avg=$(echo "scale=2; $set_total / $set_count" | bc)

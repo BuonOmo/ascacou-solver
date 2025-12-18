@@ -14,6 +14,7 @@ pub struct Board {
 	pub current_player: Player,
 	opponent: Player,
 	pub played_tiles: TileSet,
+	pub played_moves: u8,
 }
 
 impl Board {
@@ -25,6 +26,7 @@ impl Board {
 			current_player,
 			opponent,
 			played_tiles: TileSet::empty(),
+			played_moves: 0,
 		}
 	}
 
@@ -36,6 +38,7 @@ impl Board {
 			current_player,
 			opponent,
 			played_tiles: TileSet::empty(),
+			played_moves: 0,
 		}
 	}
 
@@ -148,6 +151,7 @@ impl Board {
 			current_player,
 			opponent,
 			played_tiles: TileSet::from_iter(filled_tiles(pieces_mask, black_mask)),
+			played_moves: pieces_mask.count_ones() as u8,
 		})
 	}
 
@@ -255,6 +259,7 @@ impl Board {
 			current_player: self.opponent,
 			opponent: self.current_player,
 			played_tiles,
+			played_moves: self.played_moves + 1,
 		})
 	}
 

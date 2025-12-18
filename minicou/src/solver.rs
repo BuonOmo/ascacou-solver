@@ -7,8 +7,8 @@ pub struct Solver {
 
 pub use std::primitive::i16 as EvaluationScore;
 
-const MIN_SCORE: EvaluationScore = -100;
-const MAX_SCORE: EvaluationScore = 100;
+const MIN_SCORE: EvaluationScore = -8 * 25;
+const MAX_SCORE: EvaluationScore = 8 * 25;
 
 /// Depth of forced moves search. These moves will
 /// be explored when depth is exhausted to make sure
@@ -347,7 +347,7 @@ fn key(board: &Board) -> u128 {
 // A _close to terminal_ position would be a position with few
 // available moves.
 fn evaluation(board: &Board) -> EvaluationScore {
-	board.current_score() as EvaluationScore
+	board.current_score() as EvaluationScore * board.played_moves as EvaluationScore
 }
 
 pub fn solve(board: &Board, depth: Option<u8>) -> (EvaluationScore, Option<Move>, u128) {

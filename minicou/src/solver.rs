@@ -347,16 +347,7 @@ fn key(board: &Board) -> u128 {
 // A _close to terminal_ position would be a position with few
 // available moves.
 fn evaluation(board: &Board) -> EvaluationScore {
-	let played_move_influence = match board.played_moves {
-		0..=3 => 0,
-		4..=8 => 1,
-		9..=12 => 2,
-		13..=15 => 4,
-		16..=18 => 8,
-		19..=21 => 16,
-		22.. => 32,
-	};
-	board.current_score() as EvaluationScore * played_move_influence
+	board.current_score() as EvaluationScore * board.played_moves as EvaluationScore
 }
 
 pub fn solve(board: &Board, depth: Option<u8>) -> (EvaluationScore, Option<Move>, u128) {

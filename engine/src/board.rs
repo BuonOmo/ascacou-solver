@@ -220,6 +220,9 @@ impl Board {
 	// and for played tiles, and compare those two
 	// bitmaps.
 	pub fn current_score(&self) -> i8 {
+		if self.played_moves < 4 {
+			return 0;
+		}
 		self.filled_tiles().fold(0, |acc, tile| {
 			if self.current_player.has_tile(tile) {
 				acc + 1

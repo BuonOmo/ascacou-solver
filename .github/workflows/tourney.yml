@@ -1,0 +1,122 @@
+name: Tourney
+
+on:
+  workflow_call:
+    inputs: &workflow_inputs
+      old_version:
+        description: 'Old version to compare against (tag or branch)'
+        default: 'last_tag'
+        required: true
+        type: string
+      new_version:
+        description: 'New version to test (tag, branch, or commit)'
+        default: 'main'
+        required: true
+        type: string
+      rounds:
+        description: 'Number of rounds to play per set kind'
+        default: 'startgame:10 earlygame:20 midgame:20 endgame:40'
+        required: false
+        type: string
+  workflow_dispatch:
+    inputs: *workflow_inputs
+
+jobs:
+  orchestrate:
+    runs-on: ubuntu-latest
+    outputs:
+      boards: ${{ steps.prepare_boards.outputs.boards }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # We also want to fetch the main branch.
+      - name: Prepare boards
+        id: prepare_boards
+        run: |
+          set -x
+          echo "${{ inputs.rounds }}" | jq --raw-input --compact-output '
+            .
+            | split(" ")
+            | map(split(":"))
+            | map({
+              set: .[0],
+              index: range(1; .[1] | tonumber + 1)
+            })
+          ' > boards.json
+          echo "boards=$(cat boards.json)" >> "$GITHUB_OUTPUT"
+      - run: rustup update nightly && rustup default nightly
+      - name: Prepare executables
+        run: |
+          case "${{ inputs.old_version }}" in
+            last_tag) old=$(git describe --tags --abbrev=0) ;;
+            *) old="${{ inputs.old_version }}" ;;
+          esac
+
+          mkdir exe
+
+          cargo build --release --bin=game-info
+          mv target/release/game-info exe/game_info
+
+          git checkout "${{ inputs.new_version }}"
+          cargo build --release --features=cli --bin=minicou
+          mv target/release/minicou exe/new
+
+          git checkout $old
+          cargo build --release --features=cli --bin=minicou
+          mv target/release/minicou exe/old
+      - name: Upload executables
+        uses: actions/upload-artifact@v6
+        with:
+          path: 'exe'
+          name: 'exe'
+
+  play:
+    runs-on: ubuntu-latest
+    needs: orchestrate
+    strategy:
+      matrix:
+        include: ${{ fromJson(needs.orchestrate.outputs.boards) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v7
+        with:
+          path: 'exe'
+          name: 'exe'
+      - name: Play Game
+        id: game
+        run: |
+          chmod +x exe/game_info exe/old exe/new
+          board="$(sed '${{ matrix.index }}q;d' benchmarks/data/${{ matrix.set }})"
+          ./script/match exe/game_info  exe/old  exe/new  "$board" | tee output.tmp
+          awk '/Total:/ {print $2}' output.tmp > outcome
+      - uses: actions/upload-artifact@v6
+        with:
+          name: output-${{ matrix.set }}-${{ matrix.index }}
+          path: outcome
+
+  announce:
+    runs-on: ubuntu-latest
+    needs: play
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          path: 'outputs'
+      - name: Show Tourney Result
+        run: |
+          set -x
+          echo "## Tourney Result" >> $GITHUB_STEP_SUMMARY
+          echo >> $GITHUB_STEP_SUMMARY
+          total=$(cat outputs/output-*/* | paste -sd+ - | bc)
+          count=$(ls outputs/output-*/* | wc -l)
+          avg=$(echo "scale=2; $total / $count" | bc)
+          stddev=$(cat outputs/output-*/* | awk -v mean=$avg '{sum+=($1 - mean)^2} END {print sqrt(sum/NR)}')
+          echo "| set | average score | std dev |" >> $GITHUB_STEP_SUMMARY
+          echo "|:----|--------------:|--------:|" >> $GITHUB_STEP_SUMMARY
+          for set in endgame midgame earlygame startgame; do
+            set_total=$(cat outputs/output-${set}-*/* | paste -sd+ - | bc)
+            set_count=$(ls outputs/output-${set}-*/* | wc -l)
+            set_avg=$(echo "scale=2; $set_total / $set_count" | bc)
+            set_stddev=$(cat outputs/output-${set}-*/* | awk -v mean=$set_avg '{sum+=($1 - mean)^2} END {print sqrt(sum/NR)}')
+            echo "| $set | $set_avg | $set_stddev |" >> $GITHUB_STEP_SUMMARY
+          done
+          echo "| **Overall** | **$avg** | **$stddev** |" >> $GITHUB_STEP_SUMMARY

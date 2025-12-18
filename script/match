@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+#
+# Usage: ./script/match <game-info-executable> <old-executable> <new-executable> <board>
+
+set -e
+
+(($# == 4)) || {
+	echo "Usage: $0 <game-info-executable> <old-executable> <new-executable> <board>"
+	exit 1
+}
+
+game_info="$1"
+old_exec="$2"
+new_exec="$3"
+board="$4"
+
+typeset -A execs=(-1 "$old_exec" 1 "$new_exec")
+typeset -A names=(-1 "old" 1 "new")
+
+sign() {
+	if (($1 > 0)); then
+		echo 1
+	elif (($1 < 0)); then
+		echo -1
+	else
+		echo 0
+	fi
+}
+
+next_move() {
+	$game_info "$1" "$2"
+}
+is_terminal() {
+	$game_info "$1" | awk '{print $1}' | grep -q '^true$'
+}
+score() {
+	$game_info "$1" | awk '{print $2}'
+}
+
+play() {
+	$1 --timeout=4000 --depth=25 "$2" | awk '/Move:/ {print $2}'
+}
+
+game() {
+	local board="$1"
+	local order="$2"
+
+	while ! is_terminal "$board"; do
+		move=$(play "${execs[$order]}" "$board")
+		board=$(next_move "$board" "$move")
+		order=$((-order))
+	done
+	echo $(($(score "$board") * order))
+}
+
+total=0
+for order in -1 1; do
+	echo -n "Playing from '$board', ${names[$order]} plays first... "
+	result=$(game "$board" "$order")
+	echo "Score: $result"
+	total=$((total + result))
+done
+echo
+
+echo "Total: $total"
+
+winner=$(sign $total)
+case $winner in
+0) echo "Draw" ;;
+*) echo "${names[$winner]} wins!" ;;
+esac
+
+# Success means we improved.
+((winner > 0))
+
+## Some stats
+# '//// 12345678' -> 45s with timeout 1000
+# '//// 12345678' -> 3m1 with timeout 5000
+# 'bw/1ww/1bb1w//b1ww 0367abce' -> 1m45 with timeout 5000
+# '2b1b/wwb1w/w1bw/bw1w/bw2b 137abcdf' -> 1m4 with timeout 5000

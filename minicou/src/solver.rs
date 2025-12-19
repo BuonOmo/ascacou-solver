@@ -353,8 +353,13 @@ fn evaluation(board: &Board) -> EvaluationScore {
 pub fn solve(board: &Board, depth: Option<u8>) -> (EvaluationScore, Option<Move>, u128) {
 	let mut solver = Solver::new();
 
-	let move_count: usize = board.possible_moves().count();
-	let max_depth = (move_count + 1) / 2;
+	let move_count = board.possible_moves().count() as u8;
+	// Adding FORCED_MOVE_DEPTH to the max depth to ensure we
+	// explore non-forcing moves up to the maximum if we can
+	// and only rely on forced moves if we cannot explore
+	// to full depth. Otherwise, we may end up not exploring
+	// some non-forced last moves.
+	let max_depth = (move_count + 1) / 2 + FORCED_MOVE_DEPTH;
 	let depth = depth.unwrap_or(max_depth as u8).min(max_depth as u8);
 
 	let (score, mov) = solver.negamax0(board, MIN_SCORE, MAX_SCORE, depth);
@@ -365,7 +370,7 @@ pub fn solve(board: &Board, depth: Option<u8>) -> (EvaluationScore, Option<Move>
 pub fn partial_solve(board: &Board, depth: Option<u8>) -> (EvaluationScore, Option<Move>, u128) {
 	let mut solver = Solver::new();
 
-	let move_count: u8 = board.possible_moves().count() as u8;
+	let move_count = board.possible_moves().count() as u8;
 	// Adding FORCED_MOVE_DEPTH to the max depth to ensure we
 	// explore non-forcing moves up to the maximum if we can
 	// and only rely on forced moves if we cannot explore

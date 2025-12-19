@@ -29,7 +29,7 @@ const MAX_SCORE: EvaluationScore = 100;
 /// |            5 |  -2 |    -1 |     0 |    -3 |
 /// |            6 |  -1 |     0 |     3 |     2 |
 /// |            7 |  -1 |    -3 |     4 |     0 |
-const FORCED_MOVE_DEPTH: u8 = 3;
+const FORCED_MOVE_DEPTH: u8 = 0;
 
 macro_rules! heuristic_moves {
 	( $first_color:ident => $last_color:ident [ $( ($x:expr, $y:expr) )* ] ) => {

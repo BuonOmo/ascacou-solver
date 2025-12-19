@@ -62,8 +62,8 @@ jobs:
             *) new="${{ inputs.new_version }}" ;;
           esac
 
-          if "$(git rev-parse "$old")" = "$(git rev-parse "$new")"; then
-            echo "::error title=Identical Versions::The old ({{ inputs.old_version }}) and new ({{ inputs.new_version }}) points to the same commit."
+          if [[ "$(git rev-parse "$old" 2> /dev/null || echo "$old")" == "$(git rev-parse "$new" 2> /dev/null || echo "$new")" ]]; then
+            echo "::error title=Identical Versions::The old (${{ inputs.old_version }}) and new (${{ inputs.new_version }}) points to the same commit."
             exit 1
           fi
 

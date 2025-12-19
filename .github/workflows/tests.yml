@@ -64,5 +64,5 @@ jobs:
   tourney:
     uses: ./.github/workflows/tourney.yml
     with:
-      old_version: ${{ github.ref == 'refs/heads/main' && github.ref || 'last_tag' }}
-      new_version: ${{ github.sha }}
+      old_version: ${{ github.ref_name == 'main' && 'last_tag' || 'main' }}
+      new_version: ${{ github.ref_name == 'main' && 'main' || github.ref_name }}

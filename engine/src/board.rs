@@ -283,6 +283,10 @@ impl Board {
 	 */
 	fn tiles_from<'a>(&self, mov: &'a Move) -> Option<TileSet> {
 		let mut tiles = TileSet::empty();
+		if self.played_moves < 3 {
+			// Not enough pieces on the board to create a tile.
+			return Some(tiles);
+		}
 		// A new move impacts up to a 3x3 area.
 		// We can represent it with a number
 		// that we'll have to move exactly

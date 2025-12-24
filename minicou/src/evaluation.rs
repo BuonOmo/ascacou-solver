@@ -9,10 +9,27 @@ use ascacou::{Board, TileSet};
 /// completion.
 
 pub fn evaluate(board: &Board) -> i16 {
+	if board.played_moves < 2 {
+		return 0;
+	}
+	if board.played_moves < 3 {
+		return half_tiles(board) as i16;
+	}
+	if board.played_moves < 4 {
+		return almost_full_tiles(board) as i16 + half_tiles(board) as i16;
+	}
+	if board.played_moves > 20 {
+		return board.current_score() as i16 * 8;
+	}
 	let full_tiles_score = board.current_score() as i16;
 	let almost_full_score = almost_full_tiles(board) as i16;
 	let half_tiles_score = half_tiles(board) as i16;
-	4 * full_tiles_score + 2 * almost_full_score + half_tiles_score // Max: 64 + 32 + 16 = 112
+	match board.played_moves {
+		0..=8 => full_tiles_score + almost_full_score + half_tiles_score,
+		9..=16 => full_tiles_score * 2 + almost_full_score * 2 + half_tiles_score,
+		17..=20 => full_tiles_score * 4 + almost_full_score + half_tiles_score,
+		_ => unreachable!("see guards"),
+	}
 }
 
 fn almost_full_tiles(board: &Board) -> i8 {

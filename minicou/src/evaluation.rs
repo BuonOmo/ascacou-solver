@@ -26,8 +26,8 @@ pub fn evaluate(board: &Board) -> i16 {
 	let half_tiles_score = half_tiles(board) as i16;
 	match board.played_moves {
 		0..=8 => full_tiles_score + almost_full_score + half_tiles_score,
-		9..=16 => full_tiles_score * 2 + almost_full_score * 2 + half_tiles_score,
-		17..=20 => full_tiles_score * 4 + almost_full_score + half_tiles_score,
+		9..=14 => full_tiles_score * 2 + almost_full_score * 2 + half_tiles_score,
+		15..=20 => full_tiles_score * 4 + almost_full_score + half_tiles_score,
 		_ => unreachable!("see guards"),
 	}
 }

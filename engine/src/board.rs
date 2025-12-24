@@ -12,7 +12,7 @@ pub struct Board {
 	pub pieces_mask: u64,
 	pub black_mask: u64,
 	pub current_player: Player,
-	opponent: Player,
+	pub opponent: Player,
 	pub played_tiles: TileSet,
 	pub played_moves: u8,
 }

@@ -14,6 +14,7 @@ pub use board::Board;
 pub use color::Color;
 pub use game::Game;
 pub use mov::Move;
+pub use tileset::TileSet;
 
 #[doc = include_str!("../../docs/Game-Analysis.md")]
 #[cfg(doctest)]

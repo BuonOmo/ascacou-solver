@@ -37,6 +37,10 @@ impl TileSet {
 		}
 	}
 
+	pub const fn size(&self) -> u8 {
+		self.0.count_ones() as u8
+	}
+
 	pub const fn is_full(&self) -> bool {
 		self.0 == 0xFFFF
 	}
@@ -72,6 +76,22 @@ impl std::ops::Not for TileSet {
 		// matters. Otherwise this would overflow
 		// in unknown territory.
 		TileSet::new(!self.0)
+	}
+}
+
+impl std::ops::BitAnd for TileSet {
+	type Output = Self;
+
+	fn bitand(self, rhs: Self) -> Self::Output {
+		Self(self.0 & rhs.0)
+	}
+}
+
+impl std::ops::BitOr for TileSet {
+	type Output = Self;
+
+	fn bitor(self, rhs: Self) -> Self::Output {
+		Self(self.0 | rhs.0)
 	}
 }
 

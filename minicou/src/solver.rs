@@ -1,3 +1,4 @@
+use crate::evaluate;
 use ascacou::{Board, Color::*, Move};
 
 pub struct Solver {
@@ -347,7 +348,7 @@ fn key(board: &Board) -> u128 {
 // A _close to terminal_ position would be a position with few
 // available moves.
 fn evaluation(board: &Board) -> EvaluationScore {
-	board.current_score() as EvaluationScore
+	evaluate(board)
 }
 
 pub fn solve(board: &Board, depth: Option<u8>) -> (EvaluationScore, Option<Move>, u128) {

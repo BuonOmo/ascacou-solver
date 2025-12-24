@@ -1,3 +1,4 @@
+use crate::evaluate;
 use ascacou::{Board, Color::*, Move};
 
 pub struct Solver {
@@ -7,8 +8,8 @@ pub struct Solver {
 
 pub use std::primitive::i16 as EvaluationScore;
 
-const MIN_SCORE: EvaluationScore = -100;
-const MAX_SCORE: EvaluationScore = 100;
+const MIN_SCORE: EvaluationScore = -(64 + 25);
+const MAX_SCORE: EvaluationScore = (64 + 25);
 
 /// Depth of forced moves search. These moves will
 /// be explored when depth is exhausted to make sure
@@ -36,8 +37,6 @@ macro_rules! heuristic_moves {
 		[
 			$(
 				Move::$first_color($x, $y),
-			)*
-			$(
 				Move::$last_color($x, $y),
 			)*
 		]
@@ -46,8 +45,9 @@ macro_rules! heuristic_moves {
 
 const HEURISTIC_BLACK_FIRST: [Move; 50] = heuristic_moves!(black => white [
 	// First, center
-	(2, 2) (2, 1) (1, 2) (2, 3) (3, 2)
+	(2, 1) (1, 2) (2, 3) (3, 2)
 	(1, 1) (1, 3) (3, 1) (3, 3)
+	(2, 2)
 	// Then edges
 	(0, 2) (4, 2) (2, 0) (2, 4)
 	(0, 1) (4, 1) (1, 0) (1, 4)
@@ -58,8 +58,9 @@ const HEURISTIC_BLACK_FIRST: [Move; 50] = heuristic_moves!(black => white [
 
 const HEURISTIC_WHITE_FIRST: [Move; 50] = heuristic_moves!(white => black [
 	// First, center
-	(2, 2) (2, 1) (1, 2) (2, 3) (3, 2)
+	(2, 1) (1, 2) (2, 3) (3, 2)
 	(1, 1) (1, 3) (3, 1) (3, 3)
+	(2, 2)
 	// Then edges
 	(0, 2) (4, 2) (2, 0) (2, 4)
 	(0, 1) (4, 1) (1, 0) (1, 4)
@@ -347,7 +348,7 @@ fn key(board: &Board) -> u128 {
 // A _close to terminal_ position would be a position with few
 // available moves.
 fn evaluation(board: &Board) -> EvaluationScore {
-	board.current_score() as EvaluationScore
+	evaluate(board)
 }
 
 pub fn solve(board: &Board, depth: Option<u8>) -> (EvaluationScore, Option<Move>, u128) {

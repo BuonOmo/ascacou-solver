@@ -5,7 +5,7 @@ use rand::seq::IteratorRandom;
 
 #[derive(PartialEq, Eq, Clone, Copy)]
 pub struct Player {
-	tiles: TileSet,
+	pub tiles: TileSet,
 	// Used in heuristics.
 	pub favorite_color: Color,
 }

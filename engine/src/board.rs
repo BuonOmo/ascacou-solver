@@ -12,8 +12,9 @@ pub struct Board {
 	pub pieces_mask: u64,
 	pub black_mask: u64,
 	pub current_player: Player,
-	opponent: Player,
+	pub opponent: Player,
 	pub played_tiles: TileSet,
+	pub played_moves: u8,
 }
 
 impl Board {
@@ -25,6 +26,7 @@ impl Board {
 			current_player,
 			opponent,
 			played_tiles: TileSet::empty(),
+			played_moves: 0,
 		}
 	}
 
@@ -36,6 +38,7 @@ impl Board {
 			current_player,
 			opponent,
 			played_tiles: TileSet::empty(),
+			played_moves: 0,
 		}
 	}
 
@@ -148,6 +151,7 @@ impl Board {
 			current_player,
 			opponent,
 			played_tiles: TileSet::from_iter(filled_tiles(pieces_mask, black_mask)),
+			played_moves: pieces_mask.count_ones() as u8,
 		})
 	}
 
@@ -216,6 +220,9 @@ impl Board {
 	// and for played tiles, and compare those two
 	// bitmaps.
 	pub fn current_score(&self) -> i8 {
+		if self.played_moves < 4 {
+			return 0;
+		}
 		self.filled_tiles().fold(0, |acc, tile| {
 			if self.current_player.has_tile(tile) {
 				acc + 1
@@ -255,6 +262,7 @@ impl Board {
 			current_player: self.opponent,
 			opponent: self.current_player,
 			played_tiles,
+			played_moves: self.played_moves + 1,
 		})
 	}
 
@@ -275,6 +283,10 @@ impl Board {
 	 */
 	fn tiles_from<'a>(&self, mov: &'a Move) -> Option<TileSet> {
 		let mut tiles = TileSet::empty();
+		if self.played_moves < 3 {
+			// Not enough pieces on the board to create a tile.
+			return Some(tiles);
+		}
 		// A new move impacts up to a 3x3 area.
 		// We can represent it with a number
 		// that we'll have to move exactly

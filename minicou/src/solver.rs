@@ -45,8 +45,9 @@ macro_rules! heuristic_moves {
 
 const HEURISTIC_BLACK_FIRST: [Move; 50] = heuristic_moves!(black => white [
 	// First, center
-	(2, 2) (2, 1) (1, 2) (2, 3) (3, 2)
+	(2, 1) (1, 2) (2, 3) (3, 2)
 	(1, 1) (1, 3) (3, 1) (3, 3)
+	(2, 2)
 	// Then edges
 	(0, 2) (4, 2) (2, 0) (2, 4)
 	(0, 1) (4, 1) (1, 0) (1, 4)
@@ -57,8 +58,9 @@ const HEURISTIC_BLACK_FIRST: [Move; 50] = heuristic_moves!(black => white [
 
 const HEURISTIC_WHITE_FIRST: [Move; 50] = heuristic_moves!(white => black [
 	// First, center
-	(2, 2) (2, 1) (1, 2) (2, 3) (3, 2)
+	(2, 1) (1, 2) (2, 3) (3, 2)
 	(1, 1) (1, 3) (3, 1) (3, 3)
+	(2, 2)
 	// Then edges
 	(0, 2) (4, 2) (2, 0) (2, 4)
 	(0, 1) (4, 1) (1, 0) (1, 4)

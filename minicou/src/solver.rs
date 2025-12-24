@@ -37,8 +37,6 @@ macro_rules! heuristic_moves {
 		[
 			$(
 				Move::$first_color($x, $y),
-			)*
-			$(
 				Move::$last_color($x, $y),
 			)*
 		]

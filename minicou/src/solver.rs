@@ -1,14 +1,23 @@
 use ascacou::{Board, Color::*, Move};
 
+use crate::transposition_table::{self, Bound, TranspositionTable};
+
 pub struct Solver {
 	explored_positions: u128,
-	transposition_table: std::collections::HashMap<u128, EvaluationScore>,
+	transposition_table: TranspositionTable,
 }
 
 pub use std::primitive::i16 as EvaluationScore;
 
 const MIN_SCORE: EvaluationScore = -100;
 const MAX_SCORE: EvaluationScore = 100;
+
+/// Number of slots in the transposition table. Chosen as a prime
+/// number so that, combined with the modulo indexing, positions
+/// spread more evenly across the table and collisions between
+/// unrelated keys are less likely to line up. This size targets
+/// roughly 100MB of memory (each entry being a handful of bytes).
+const TRANSPOSITION_TABLE_SIZE: usize = 8_388_593;
 
 /// Depth of forced moves search. These moves will
 /// be explored when depth is exhausted to make sure
@@ -72,7 +81,7 @@ impl Solver {
 	fn new() -> Solver {
 		Solver {
 			explored_positions: 0,
-			transposition_table: std::collections::HashMap::new(),
+			transposition_table: TranspositionTable::new(TRANSPOSITION_TABLE_SIZE),
 		}
 	}
 
@@ -115,34 +124,65 @@ impl Solver {
 	fn negamax(
 		&mut self,
 		board: &Board,
-		mut alpha: EvaluationScore,
-		mut beta: EvaluationScore,
+		alpha: EvaluationScore,
+		beta: EvaluationScore,
 		depth: u8,
 	) -> EvaluationScore {
 		debug_assert!(alpha < beta);
 		self.explored_positions += 1;
 
-		let key = key(&board);
+		let key = transposition_table::key(board);
+		let original_alpha = alpha;
+		let mut alpha = alpha;
+		let mut beta = beta;
 
-		// Reduce window by finding a transposition with a lower beta.
-		if let Some(cached_beta) = self.transposition_table.get(&key) {
-			if beta > *cached_beta {
-				beta = *cached_beta;
+		// Try to use a previous search's result, either as a direct
+		// cutoff (when it was computed at least as deep as we need
+		// here), or to narrow our alpha-beta window.
+		if let Some(entry) = self.transposition_table.get(key) {
+			if entry.depth >= depth {
+				match entry.bound {
+					Bound::Exact => return entry.score,
+					Bound::Lower => {
+						if entry.score >= beta {
+							return entry.score;
+						}
+						if entry.score > alpha {
+							alpha = entry.score;
+						}
+					}
+					Bound::Upper => {
+						if entry.score <= alpha {
+							return entry.score;
+						}
+						if entry.score < beta {
+							beta = entry.score;
+						}
+					}
+				}
 				if alpha >= beta {
-					return beta;
+					return entry.score;
 				}
 			}
 		}
 
 		if depth == 0 {
-			return evaluation(board);
+			let score = evaluation(board);
+			self.transposition_table
+				.insert(key, score, depth, Bound::Exact, None);
+			return score;
 		}
 
-		let boards = next_boards::<Board>(&board, depth <= FORCED_MOVE_DEPTH);
+		let boards_and_moves = next_boards::<(Board, Move)>(&board, depth <= FORCED_MOVE_DEPTH);
 
 		let mut terminal = true;
+		// Fail-soft: track the actual best score found, rather than
+		// only the (possibly still un-raised) alpha bound. This
+		// gives tighter, more reusable transposition table entries.
+		let mut best_score = MIN_SCORE - 1;
+		let mut best_move: Option<Move> = None;
 
-		for board in boards {
+		for (next_board, mov) in boards_and_moves {
 			terminal = false;
 			// TODO(perf): we could have the board being part of the solver as mutable, and
 			//  have a function to make a move and unmake a move. This way we would not
@@ -155,9 +195,16 @@ impl Solver {
 			//
 			//  a simple implementation of this idea only yields a quite small improvement (from 1.9ms to 1.7ms for a
 			//  full random game simulation)
-			let score = -self.negamax(&board, -beta, -alpha, depth - 1);
+			let score = -self.negamax(&next_board, -beta, -alpha, depth - 1);
+
+			if score > best_score {
+				best_score = score;
+				best_move = Some(mov);
+			}
 
 			if score >= beta {
+				self.transposition_table
+					.insert(key, score, depth, Bound::Lower, Some(mov));
 				return score;
 			}
 
@@ -167,13 +214,24 @@ impl Solver {
 		}
 
 		if terminal {
-			alpha = evaluation(&board);
+			let score = evaluation(board);
+			self.transposition_table
+				.insert(key, score, depth, Bound::Exact, None);
+			return score;
 		}
 
-		self.transposition_table.insert(key, alpha);
-		return alpha;
+		let bound = if best_score <= original_alpha {
+			Bound::Upper
+		} else {
+			Bound::Exact
+		};
+		self.transposition_table
+			.insert(key, best_score, depth, bound, best_move);
+
+		return best_score;
 	}
 }
+
 
 struct MaskIterator(u64);
 
@@ -332,11 +390,7 @@ impl<'a> Iterator for AllMoveIterator<'a, (Board, Move)> {
 	}
 }
 
-// TODO(perf): Design a u64 key, and try partial key matching.
-// See https://www.chessprogramming.org/Transposition_Table
-fn key(board: &Board) -> u128 {
-	(board.pieces_mask as u128) | ((board.black_mask as u128) << 64)
-}
+// TTs are addressed with a 50 bit key built in `transposition_table::key`.
 
 // TODO: a smarter score computation could be done by taking into
 // account each player's score, and give a greater edge to a position

@@ -28,7 +28,7 @@ jobs:
     outputs:
       boards: ${{ steps.prepare_boards.outputs.boards }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # We also want to fetch the main branch.
       - name: Prepare boards
@@ -92,7 +92,7 @@ jobs:
       matrix:
         include: ${{ fromJson(needs.orchestrate.outputs.boards) }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/download-artifact@v7
         with:
           path: 'exe'

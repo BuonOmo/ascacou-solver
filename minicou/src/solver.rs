@@ -387,7 +387,7 @@ pub fn partial_solve(board: &Board, depth: Option<u8>) -> (EvaluationScore, Opti
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use std::assert_matches::assert_matches;
+	use std::assert_matches;
 
 	#[test]
 	fn test_forced_moves() {

@@ -1,3 +1,5 @@
+use std::time::{Duration, Instant};
+
 use ascacou::{Board, Color::*, Move};
 
 use crate::transposition_table::{self, Bound, TranspositionTable};
@@ -5,12 +7,28 @@ use crate::transposition_table::{self, Bound, TranspositionTable};
 pub struct Solver {
 	explored_positions: u128,
 	transposition_table: TranspositionTable,
+	/// When set, the search periodically checks the wall clock
+	/// against this deadline and bails out early (see
+	/// `check_time_up`) once it is passed.
+	deadline: Option<Instant>,
+	/// Sticky flag set once `check_time_up` observes we're past the
+	/// deadline. Reading a `bool` is essentially free, so every
+	/// recursive call can check it before doing any work, while the
+	/// (comparatively expensive) `Instant::now()` call itself is
+	/// only done every `TIME_CHECK_INTERVAL` explored positions.
+	time_up: bool,
 }
 
 pub use std::primitive::i16 as EvaluationScore;
 
 const MIN_SCORE: EvaluationScore = -100;
 const MAX_SCORE: EvaluationScore = 100;
+
+/// How often (in explored positions) we check the wall clock against
+/// the deadline, when one is set. Checking on every node would make
+/// `Instant::now()` calls a measurable chunk of the per-node cost;
+/// checking too rarely would make the deadline imprecise.
+const TIME_CHECK_INTERVAL: u128 = 4096;
 
 /// Number of slots in the transposition table. Chosen as a prime
 /// number so that, combined with the modulo indexing, positions
@@ -78,11 +96,30 @@ const HEURISTIC_WHITE_FIRST: [Move; 50] = heuristic_moves!(white => black [
 ]);
 
 impl Solver {
-	fn new() -> Solver {
+	fn new(deadline: Option<Instant>) -> Solver {
 		Solver {
 			explored_positions: 0,
 			transposition_table: TranspositionTable::new(TRANSPOSITION_TABLE_SIZE),
+			deadline,
+			time_up: false,
 		}
+	}
+
+	/// Returns whether the search deadline (if any) has passed. Only
+	/// touches the wall clock every `TIME_CHECK_INTERVAL` positions;
+	/// relies on `self.explored_positions` having already been
+	/// incremented by the caller for this node.
+	fn check_time_up(&mut self) -> bool {
+		if self.time_up {
+			return true;
+		}
+		let Some(deadline) = self.deadline else {
+			return false;
+		};
+		if self.explored_positions % TIME_CHECK_INTERVAL == 0 && Instant::now() >= deadline {
+			self.time_up = true;
+		}
+		self.time_up
 	}
 
 	fn negamax0<'a>(
@@ -91,18 +128,44 @@ impl Solver {
 		mut alpha: EvaluationScore,
 		beta: EvaluationScore,
 		depth: u8,
+		hint: Option<Move>,
 	) -> (EvaluationScore, Option<Move>) {
 		self.explored_positions += 1;
+
+		if self.check_time_up() {
+			return (evaluation(board), None);
+		}
 
 		if depth == 0 {
 			return (evaluation(board), None);
 		}
 
-		let boards_and_moves = next_boards::<(Board, Move)>(&board, false);
-
 		let mut best_mov: Option<Move> = None;
 		let mut terminal = true;
+
+		// Try the previous iteration's best move first: if it's
+		// still the best, we get an immediate beta cutoff on
+		// everything else at this node.
+		if let Some(mov) = hint {
+			if let Some(child) = board.next(&mov) {
+				terminal = false;
+				let score = -self.negamax(&child, -beta, -alpha, depth - 1);
+				if score >= beta {
+					return (score, Some(mov));
+				}
+				if score > alpha {
+					alpha = score;
+					best_mov = Some(mov);
+				}
+			}
+		}
+
+		let boards_and_moves = next_boards::<(Board, Move)>(&board, false);
+
 		for (board, mov) in boards_and_moves {
+			if Some(mov) == hint {
+				continue;
+			}
 			terminal = false;
 			let score = -self.negamax(&board, -beta, -alpha, depth - 1);
 			if score >= beta {
@@ -131,15 +194,23 @@ impl Solver {
 		debug_assert!(alpha < beta);
 		self.explored_positions += 1;
 
+		if self.check_time_up() {
+			return evaluation(board);
+		}
+
 		let key = transposition_table::key(board);
 		let original_alpha = alpha;
 		let mut alpha = alpha;
 		let mut beta = beta;
+		let mut preferred_move: Option<Move> = None;
 
 		// Try to use a previous search's result, either as a direct
 		// cutoff (when it was computed at least as deep as we need
-		// here), or to narrow our alpha-beta window.
+		// here), or to narrow our alpha-beta window. Even when the
+		// stored depth isn't enough for a cutoff, its best move is
+		// still a good move-ordering hint.
 		if let Some(entry) = self.transposition_table.get(key) {
+			preferred_move = entry.best_move;
 			if entry.depth >= depth {
 				match entry.bound {
 					Bound::Exact => return entry.score,
@@ -168,12 +239,18 @@ impl Solver {
 
 		if depth == 0 {
 			let score = evaluation(board);
-			self.transposition_table
-				.insert(key, score, depth, Bound::Exact, None);
+			if !self.time_up {
+				self.transposition_table
+					.insert(key, score, depth, Bound::Exact, None);
+			}
 			return score;
 		}
 
-		let boards_and_moves = next_boards::<(Board, Move)>(&board, depth <= FORCED_MOVE_DEPTH);
+		let forced = depth <= FORCED_MOVE_DEPTH;
+		// During the forced-move phase the candidate set is already
+		// small and has a different meaning (a specific pattern, not
+		// a heuristic ranking), so we don't reorder it.
+		let preferred_move = if forced { None } else { preferred_move };
 
 		let mut terminal = true;
 		// Fail-soft: track the actual best score found, rather than
@@ -182,7 +259,36 @@ impl Solver {
 		let mut best_score = MIN_SCORE - 1;
 		let mut best_move: Option<Move> = None;
 
+		if let Some(mov) = preferred_move {
+			if let Some(next_board) = board.next(&mov) {
+				terminal = false;
+				let score = -self.negamax(&next_board, -beta, -alpha, depth - 1);
+
+				if score > best_score {
+					best_score = score;
+					best_move = Some(mov);
+				}
+
+				if score >= beta {
+					if !self.time_up {
+						self.transposition_table
+							.insert(key, score, depth, Bound::Lower, Some(mov));
+					}
+					return score;
+				}
+
+				if score > alpha {
+					alpha = score;
+				}
+			}
+		}
+
+		let boards_and_moves = next_boards::<(Board, Move)>(&board, forced);
+
 		for (next_board, mov) in boards_and_moves {
+			if Some(mov) == preferred_move {
+				continue;
+			}
 			terminal = false;
 			// TODO(perf): we could have the board being part of the solver as mutable, and
 			//  have a function to make a move and unmake a move. This way we would not
@@ -203,8 +309,10 @@ impl Solver {
 			}
 
 			if score >= beta {
-				self.transposition_table
-					.insert(key, score, depth, Bound::Lower, Some(mov));
+				if !self.time_up {
+					self.transposition_table
+						.insert(key, score, depth, Bound::Lower, Some(mov));
+				}
 				return score;
 			}
 
@@ -215,8 +323,10 @@ impl Solver {
 
 		if terminal {
 			let score = evaluation(board);
-			self.transposition_table
-				.insert(key, score, depth, Bound::Exact, None);
+			if !self.time_up {
+				self.transposition_table
+					.insert(key, score, depth, Bound::Exact, None);
+			}
 			return score;
 		}
 
@@ -225,8 +335,10 @@ impl Solver {
 		} else {
 			Bound::Exact
 		};
-		self.transposition_table
-			.insert(key, best_score, depth, bound, best_move);
+		if !self.time_up {
+			self.transposition_table
+				.insert(key, best_score, depth, bound, best_move);
+		}
 
 		return best_score;
 	}
@@ -392,6 +504,72 @@ impl<'a> Iterator for AllMoveIterator<'a, (Board, Move)> {
 
 // TTs are addressed with a 50 bit key built in `transposition_table::key`.
 
+fn max_depth_for(board: &Board) -> u8 {
+	let move_count = board.possible_moves().count() as u8;
+	// Adding FORCED_MOVE_DEPTH to the max depth to ensure we
+	// explore non-forcing moves up to the maximum if we can
+	// and only rely on forced moves if we cannot explore
+	// to full depth. Otherwise, we may end up not exploring
+	// some non-forced last moves.
+	(move_count + 1) / 2 + FORCED_MOVE_DEPTH
+}
+
+/// Iterative deepening driver used by the time-bounded solve
+/// variants: searches depth 1, 2, ... up to `depth` (capped at the
+/// position's max useful depth), reusing each completed iteration's
+/// best move as a move-ordering hint for the next one, so that a
+/// deadline expiring mid-iteration still leaves a usable answer from
+/// the last fully completed depth.
+///
+/// When `time_limit` is exceeded while searching a given depth, that
+/// (possibly incomplete) iteration is discarded and the result of the
+/// last fully completed iteration is returned instead of blocking
+/// until the full target depth is reached.
+///
+/// When there is no time limit, the target depth is already known
+/// upfront, so we skip straight to it instead of redundantly
+/// re-searching every shallower depth first: unlike a real-time
+/// budget, here the shallower iterations would only add overhead
+/// with no benefit, since within-search transposition table reuse
+/// already reorders moves at every node.
+fn solve_iterative(
+	board: &Board,
+	depth: Option<u8>,
+	root_alpha: EvaluationScore,
+	root_beta: EvaluationScore,
+	time_limit: Option<Duration>,
+) -> (EvaluationScore, Option<Move>, u128) {
+	let max_depth = max_depth_for(board);
+	let target_depth = depth.unwrap_or(max_depth).min(max_depth);
+
+	let Some(time_limit) = time_limit else {
+		let mut solver = Solver::new(None);
+		let (score, mov) = solver.negamax0(board, root_alpha, root_beta, target_depth, None);
+		return (score, mov, solver.explored_positions);
+	};
+
+	let mut solver = Solver::new(Some(Instant::now() + time_limit));
+
+	// Fallback for `target_depth == 0` (or a deadline expiring before
+	// depth 1 even completes): the position's static evaluation with
+	// no move, matching what a direct `depth == 0` search would give.
+	let mut best_score = evaluation(board);
+	let mut best_move: Option<Move> = None;
+	let mut hint: Option<Move> = None;
+
+	for current_depth in 1..=target_depth {
+		let (score, mov) = solver.negamax0(board, root_alpha, root_beta, current_depth, hint);
+		if solver.time_up {
+			break;
+		}
+		best_score = score;
+		best_move = mov;
+		hint = mov;
+	}
+
+	(best_score, best_move, solver.explored_positions)
+}
+
 // TODO: a smarter score computation could be done by taking into
 // account each player's score, and give a greater edge to a position
 // close to terminal. More interesting even is the idea of taking into
@@ -405,38 +583,35 @@ fn evaluation(board: &Board) -> EvaluationScore {
 }
 
 pub fn solve(board: &Board, depth: Option<u8>) -> (EvaluationScore, Option<Move>, u128) {
-	let mut solver = Solver::new();
-
-	let move_count = board.possible_moves().count() as u8;
-	// Adding FORCED_MOVE_DEPTH to the max depth to ensure we
-	// explore non-forcing moves up to the maximum if we can
-	// and only rely on forced moves if we cannot explore
-	// to full depth. Otherwise, we may end up not exploring
-	// some non-forced last moves.
-	let max_depth = (move_count + 1) / 2 + FORCED_MOVE_DEPTH;
-	let depth = depth.unwrap_or(max_depth as u8).min(max_depth as u8);
-
-	let (score, mov) = solver.negamax0(board, MIN_SCORE, MAX_SCORE, depth);
-
-	(score, mov, solver.explored_positions)
+	solve_iterative(board, depth, MIN_SCORE, MAX_SCORE, None)
 }
 
 pub fn partial_solve(board: &Board, depth: Option<u8>) -> (EvaluationScore, Option<Move>, u128) {
-	let mut solver = Solver::new();
-
-	let move_count = board.possible_moves().count() as u8;
-	// Adding FORCED_MOVE_DEPTH to the max depth to ensure we
-	// explore non-forcing moves up to the maximum if we can
-	// and only rely on forced moves if we cannot explore
-	// to full depth. Otherwise, we may end up not exploring
-	// some non-forced last moves.
-	let max_depth = (move_count + 1) / 2 + FORCED_MOVE_DEPTH;
-	let depth = depth.unwrap_or(max_depth as u8).min(max_depth as u8);
-
-	let (score, mov) = solver.negamax0(board, -1, 1, depth);
-
-	(score, mov, solver.explored_positions)
+	solve_iterative(board, depth, -1, 1, None)
 }
+
+/// Like `solve`, but instead of only supporting a fixed target depth,
+/// stops iterative deepening once `time_limit` has elapsed and
+/// returns the best move found by the last depth that finished
+/// searching in time.
+pub fn solve_with_time_limit(
+	board: &Board,
+	depth: Option<u8>,
+	time_limit: Duration,
+) -> (EvaluationScore, Option<Move>, u128) {
+	solve_iterative(board, depth, MIN_SCORE, MAX_SCORE, Some(time_limit))
+}
+
+/// Like `partial_solve`, with the same time budget semantics as
+/// `solve_with_time_limit`.
+pub fn partial_solve_with_time_limit(
+	board: &Board,
+	depth: Option<u8>,
+	time_limit: Duration,
+) -> (EvaluationScore, Option<Move>, u128) {
+	solve_iterative(board, depth, -1, 1, Some(time_limit))
+}
+
 
 #[cfg(test)]
 mod tests {
